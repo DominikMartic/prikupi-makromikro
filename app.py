@@ -4,6 +4,7 @@ from datetime import datetime
 import io
 import html
 import os
+from supabase import create_client, Client
 
 # ReportLab za profesionalni PDF izgled
 from reportlab.lib.pagesizes import A4
@@ -13,27 +14,79 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 
 st.set_page_config(page_title="Makromikro - Prikupi & Povrati", layout="wide", page_icon="📦")
 
-CSV_FILE = "nalozi.csv"
+# === PODACI ZA KONEKCIJU NA SUPABASE BAZU ===
+SUPABASE_URL = "https://mxirprzgxtiwyhrmkyxv.supabase.co/rest/v1/"
+SUPABASE_KEY = "sb_publishable_2S7TjxGUgklILren3fJl0g_Gosq01mB"
 
-# --- FUNKCIJE ZA TRAJNO SPREMANJE I UČITAVANJE PODATAKA ---
+@st.cache_resource
+def init_supabase() -> Client:
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
+
+try:
+    supabase = init_supabase()
+except Exception as e:
+    supabase = None
+
+# --- SPREMANJE I UČITAVANJE IZ TRAJNE BAZE ---
 def ucitaj_naloge():
-    if os.path.exists(CSV_FILE):
+    if supabase:
         try:
-            df = pd.read_csv(CSV_FILE, dtype=str)
-            return df.fillna("-").to_dict('records')
+            response = supabase.table("nalozi").select("*").order("created_at", desc=False).execute()
+            raw_data = response.data
+            # Prilagodba imena stupaca za aplikaciju
+            nalozi = []
+            for r in raw_data:
+                nalozi.append({
+                    "ID Naloga": r.get("id", "-"),
+                    "Tip": r.get("tip", "-"),
+                    "Komercijalist": r.get("komercijalist", "-"),
+                    "Datum Prikupa": r.get("datum_prikupa", "-"),
+                    "Dobavljač": r.get("dobavljac", "-"),
+                    "Kontakt": r.get("kontakt", "-"),
+                    "Adresa Prikupa": r.get("adresa_prikupa", "-"),
+                    "Adresa Dostave": r.get("adresa_dostave", "-"),
+                    "Opis robe": r.get("opis_robe", "-"),
+                    "Napomena": r.get("napomena", "-"),
+                    "Status": r.get("status", "-"),
+                    "Vrijeme Obrade": r.get("vrijeme_obrade", "-")
+                })
+            return nalozi
         except Exception:
             return []
     return []
 
-def spremi_naloge(nalozi_list):
-    if nalozi_list:
-        df = pd.DataFrame(nalozi_list)
-        df.to_csv(CSV_FILE, index=False)
-    else:
-        if os.path.exists(CSV_FILE):
-            os.remove(CSV_FILE)
+def spremi_novi_nalog(n):
+    if supabase:
+        try:
+            data = {
+                "id": n["ID Naloga"],
+                "tip": n["Tip"],
+                "komercijalist": n["Komercijalist"],
+                "datum_prikupa": n["Datum Prikupa"],
+                "dobavljac": n["Dobavljač"],
+                "kontakt": n["Kontakt"],
+                "adresa_prikupa": n["Adresa Prikupa"],
+                "adresa_dostave": n["Adresa Dostave"],
+                "opis_robe": n["Opis robe"],
+                "napomena": n["Napomena"],
+                "status": n["Status"],
+                "vrijeme_obrade": n["Vrijeme Obrade"]
+            }
+            supabase.table("nalozi").insert(data).execute()
+        except Exception as e:
+            st.error(f"Greška pri spremanju u bazu: {e}")
 
-# Inicijalizacija baze u session_state iz CSV datoteke
+def azuriraj_status_naloga(id_naloga, novi_status, vrijeme_obrade="-"):
+    if supabase:
+        try:
+            supabase.table("nalozi").update({
+                "status": novi_status,
+                "vrijeme_obrade": vrijeme_obrade
+            }).eq("id", id_naloga).execute()
+        except Exception as e:
+            st.error(f"Greška pri ažuriranju: {e}")
+
+# Inicijalizacija baze u session_state
 if "baza_naloga" not in st.session_state:
     st.session_state.baza_naloga = ucitaj_naloge()
 
@@ -49,7 +102,6 @@ st.markdown("""
 
 st.title("📦 MAKROMIKRO GRUPA — Upravljanje Prikupima i Povratima")
 
-# Pronađi logo ako postoji
 def nadji_logo():
     moguce_opcije = ["logo.png", "logo.jpg", "logo.jpeg", "logo.PNG", "LOGO.PNG", "LOGO.JPG"]
     for f in moguce_opcije:
@@ -220,12 +272,17 @@ with tab1:
                     "Status": "Na čekanju",
                     "Vrijeme Obrade": "-"
                 }
-                st.session_state.baza_naloga.append(novi_nalog)
-                spremi_naloge(st.session_state.baza_naloga)  # Trajno spremanje u CSV
-                st.success(f"Nalog {id_naloga} uspuješno spremljen!")
+                spremi_novi_nalog(novi_nalog)
+                st.session_state.baza_naloga = ucitaj_naloge()
+                st.success(f"Nalog {id_naloga} uspuješno i trajno spremljen!")
 
 with tab2:
     st.subheader("Filtriranje i Upravljanje Nalozima")
+    
+    # Osvježi podatke iz baze na gumb
+    if st.button("🔄 Osvježi podatke iz baze"):
+        st.session_state.baza_naloga = ucitaj_naloge()
+        st.rerun()
 
     if not st.session_state.baza_naloga:
         st.info("Trenutno nema unesenih naloga.")
@@ -253,8 +310,8 @@ with tab2:
             if col_act1.button("✏️ Označi ove naloge kao 'Isprintano'"):
                 for item in za_print:
                     if item["Status"] == "Na čekanju":
-                        item["Status"] = "Isprintano"
-                spremi_naloge(st.session_state.baza_naloga)
+                        azuriraj_status_naloga(item["ID Naloga"], "Isprintano")
+                st.session_state.baza_naloga = ucitaj_naloge()
                 st.rerun()
         else:
             col_act1.info("Nema naloga spremnih za ispis.")
@@ -264,10 +321,9 @@ with tab2:
             brojac = 0
             for item in filtrirani:
                 if item["Status"] in ["Na čekanju", "Isprintano"]:
-                    item["Status"] = "Prikupljeno"
-                    item["Vrijeme Obrade"] = sada_str
+                    azuriraj_status_naloga(item["ID Naloga"], "Prikupljeno", sada_str)
                     brojac += 1
-            spremi_naloge(st.session_state.baza_naloga)
+            st.session_state.baza_naloga = ucitaj_naloge()
             st.success(f"Status promijenjen u 'Prikupljeno' za {brojac} naloga!")
             st.rerun()
 
@@ -292,10 +348,9 @@ with tab2:
                 )
 
                 if novi_status != nalog['Status']:
-                    nalog['Status'] = novi_status
-                    if novi_status == "Prikupljeno":
-                        nalog['Vrijeme Obrade'] = datetime.now().strftime("%d.%m.%Y. %H:%M")
-                    spremi_naloge(st.session_state.baza_naloga)
+                    vrijeme = datetime.now().strftime("%d.%m.%Y. %H:%M") if novi_status == "Prikupljeno" else "-"
+                    azuriraj_status_naloga(nalog['ID Naloga'], novi_status, vrijeme)
+                    st.session_state.baza_naloga = ucitaj_naloge()
                     st.rerun()
 
                 st.markdown("<hr style='margin:8px 0; border:0.5px solid #eee;'>", unsafe_allow_html=True)
