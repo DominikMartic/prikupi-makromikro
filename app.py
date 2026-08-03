@@ -133,7 +133,11 @@ if "is_logged_in" not in st.session_state:
     st.session_state.is_logged_in = False
 
 if "user_role" not in st.session_state:
-    st.session_state.user_role = None  # Može biti "komercijalist" ili "admin"
+    st.session_state.user_role = None
+
+# Privremene memorijske varijable za funkciju "Ponovi prikup"
+if "ponovi_prikup_data" not in st.session_state:
+    st.session_state.ponovi_prikup_data = None
 
 st.markdown("""
     <style>
@@ -148,7 +152,7 @@ st.markdown("""
 
 st.title("📦 MAKROMIKRO GRUPA — Upravljanje Prikupima i Povratima")
 
-# --- SUSTAV ZA PRIJAVU (EKRAN ZA LOGIN AKO NIJE PRIJAVLJEN) ---
+# --- SUSTAV ZA PRIJAVU ---
 if not st.session_state.is_logged_in:
     st.warning("🔒 Za pristup aplikaciji obavezna je prijava.")
     
@@ -156,7 +160,6 @@ if not st.session_state.is_logged_in:
     with col_l1:
         unesena_lozinka = st.text_input("Unesite pristupnu lozinku:", type="password")
         if st.button("Prijavi se", type="primary"):
-            # Ovdje definiramo lozinke
             if unesena_lozinka == "admin123":
                 st.session_state.is_logged_in = True
                 st.session_state.user_role = "admin"
@@ -169,14 +172,15 @@ if not st.session_state.is_logged_in:
                 st.rerun()
             else:
                 st.error("Pogrešna lozinka!")
-    st.stop() # Zaustavlja daljnje učitavanje stranice dok se korisnik ne prijavi
+    st.stop()
 
-# --- GLAVNI DIO APLIKACIJE (KADA JE KORISNIK PRIJAVLJEN) ---
+# --- GLAVNI DIO APLIKACIJE ---
 c_top1, c_top2 = st.columns([4, 1])
 c_top1.info(f"Prijavljeni ste kao: **{st.session_state.user_role.upper()}**")
 if c_top2.button("🔒 Odjava"):
     st.session_state.is_logged_in = False
     st.session_state.user_role = None
+    st.session_state.ponovi_prikup_data = None
     st.rerun()
 
 def nadji_logo():
@@ -302,11 +306,22 @@ tab1, tab2 = st.tabs(["➕ Unos Novog Naloga", "📋 Pregled, Print & Upravljanj
 with tab1:
     st.subheader("Unos novog naloga")
 
+    # Provjera ako se radi "Ponovi prikup" iz pregleda
+    pp_data = st.session_state.ponovi_prikup_data
+    if pp_data:
+        st.info(f"🔄 Učitani podaci za ponovljeni prikup iz naloga **{pp_data.get('ID Naloga', '')}**")
+
     dobavljaci_dict = st.session_state.baza_dobavljaca
     lista_dobavljaca = ["Novi dobavljač..."] + sorted(list(dobavljaci_dict.keys()))
 
     c_dob1, c_dob2 = st.columns([1, 1])
-    odabrani_dobavljac_opcija = c_dob1.selectbox("Odaberi postojećeg dobavljača (ili unesi novog):", lista_dobavljaca)
+    
+    # Pronađi indeks dobavljača ako je učitan preko ponovi prikup
+    default_dob_index = 0
+    if pp_data and pp_data.get("Dobavljač") in lista_dobavljaca:
+        default_dob_index = lista_dobavljaca.index(pp_data.get("Dobavljač"))
+
+    odabrani_dobavljac_opcija = c_dob1.selectbox("Odaberi postojećeg dobavljača (ili unesi novog):", lista_dobavljaca, index=default_dob_index)
 
     if odabrani_dobavljac_opcija != "Novi dobavljač...":
         podaci_dob = dobavljaci_dict.get(odabrani_dobavljac_opcija, {})
@@ -314,17 +329,19 @@ with tab1:
         zadati_kontakt = podaci_dob.get("kontakt", "")
         zadana_adresa = podaci_dob.get("adresa_prikupa", "")
         zadana_napomena = podaci_dob.get("napomena", "")
-        st.info(f"💡 Automatski povučeni podaci za dobavljača **{odabrani_dobavljac_opcija}**")
     else:
-        zadati_naziv = ""
-        zadati_kontakt = ""
-        zadana_adresa = ""
-        zadana_napomena = ""
+        zadati_naziv = pp_data.get("Dobavljač", "") if pp_data else ""
+        zadati_kontakt = pp_data.get("Kontakt", "") if pp_data else ""
+        zadana_adresa = pp_data.get("Adresa Prikupa", "") if pp_data else ""
+        zadana_napomena = pp_data.get("Napomena", "") if pp_data else ""
 
     with st.form("forma_unos", clear_on_submit=True):
         c1, c2, c3 = st.columns(3)
-        tip = c1.selectbox("Tip dokumenta", ["Prikup", "Povrat"])
-        komercijalist = c2.text_input("Podnositelj zahtjeva (Komercijalist)")
+        
+        default_tip_idx = 1 if pp_data and pp_data.get("Tip") == "Povrat" else 0
+        tip = c1.selectbox("Tip dokumenta", ["Prikup", "Povrat"], index=default_tip_idx)
+        
+        komercijalist = c2.text_input("Podnositelj zahtjeva (Komercijalist)", value=pp_data.get("Komercijalist", "") if pp_data else "")
         datum = c3.date_input("Datum prikupa", datetime.now())
 
         c4, c5 = st.columns(2)
@@ -335,7 +352,7 @@ with tab1:
         adresa_prikupa = c6.text_input("Adresa prikupljanja", value=zadana_adresa if zadana_adresa != "-" else "", placeholder="npr. Tina Ujevića 28, Dugo Selo")
         adresa_dostave = c7.text_input("Adresa dostave", value="Makromikro grupa d.o.o., Vukomerička ulica 6, 10410 Velika Gorica")
 
-        opis = st.text_area("Vrsta robe / Opis i količina")
+        opis = st.text_area("Vrsta robe / Opis i količina", value=pp_data.get("Opis robe", "") if pp_data else "")
         napomena = st.text_input("Napomena za vozača", value=zadana_napomena if zadana_napomena != "-" else "")
 
         submit = st.form_submit_button("Spremi Nalog", type="primary")
@@ -365,7 +382,13 @@ with tab1:
                 spremi_novi_nalog(novi_nalog)
                 st.session_state.baza_naloga = ucitaj_naloge()
                 st.session_state.baza_dobavljaca = ucitaj_dobavljace()
+                st.session_state.ponovi_prikup_data = None # Očisti privremenu memoriju
                 st.success(f"Nalog {id_naloga} uspješno spremljen! Podaci o dobavljaču zapamćeni za ubuduće.")
+
+    if pp_data:
+        if st.button("❌ Poništi ponovljeni unos"):
+            st.session_state.ponovi_prikup_data = None
+            st.rerun()
 
 with tab2:
     st.subheader("📋 Pregled svih unesenih naloga")
@@ -378,16 +401,52 @@ with tab2:
     if not st.session_state.baza_naloga:
         st.info("Trenutno nema unesenih naloga.")
     else:
-        sve_datume = sorted(list(set([x["Datum Prikupa"] for x in st.session_state.baza_naloga])), reverse=True)
-        col_f1, _ = st.columns([1, 2])
-        odabrani_datum = col_f1.selectbox("Filter po datumu prikupa:", ["Svi datumi"] + sve_datume)
+        # --- NAPREDNI FILTERI I PRETRAGA ---
+        st.markdown("#### 🔍 Pretraga i Filteri")
+        f_kol1, f_kol2, f_kol3, f_kol4 = st.columns(4)
 
-        filtrirani = st.session_state.baza_naloga if odabrani_datum == "Svi datumi" else [x for x in st.session_state.baza_naloga if x["Datum Prikupa"] == odabrani_datum]
+        # 1. Univerzalna tražilica
+        search_query = f_kol1.text_input("Pretraživanje (pojam):", placeholder="npr. HP, toner, PR-2026...")
+
+        # 2. Filter po datumu
+        sve_datume = sorted(list(set([x["Datum Prikupa"] for x in st.session_state.baza_naloga])), reverse=True)
+        odabrani_datum = f_kol2.selectbox("Filter po datumu:", ["Svi datumi"] + sve_datume)
+
+        # 3. Filter po komercijalistu
+        svi_komercijalisti = sorted(list(set([x["Komercijalist"] for x in st.session_state.baza_naloga])))
+        odabrani_komercijalist = f_kol3.selectbox("Filter po komercijalistu:", ["Svi komercijalisti"] + svi_komercijalisti)
+
+        # 4. Filter po dobavljaču
+        svi_dobavljaci_lista = sorted(list(set([x["Dobavljač"] for x in st.session_state.baza_naloga])))
+        odabrani_dobavljac_filter = f_kol4.selectbox("Filter po dobavljaču:", ["Svi dobavljači"] + svi_dobavljaci_lista)
+
+        # Primjena filtera
+        filtrirani = st.session_state.baza_naloga
+
+        if odabrani_datum != "Svi datumi":
+            filtrirani = [x for x in filtrirani if x["Datum Prikupa"] == odabrani_datum]
+
+        if odabrani_komercijalist != "Svi komercijalisti":
+            filtrirani = [x for x in filtrirani if x["Komercijalist"] == odabrani_komercijalist]
+
+        if odabrani_dobavljac_filter != "Svi dobavljači":
+            filtrirani = [x for x in filtrirani if x["Dobavljač"] == odabrani_dobavljac_filter]
+
+        if search_query:
+            sq = search_query.lower()
+            filtrirani = [
+                x for x in filtrirani if 
+                sq in x["ID Naloga"].lower() or 
+                sq in x["Dobavljač"].lower() or 
+                sq in x["Opis robe"].lower() or 
+                sq in x["Komercijalist"].lower() or
+                sq in x["Adresa Prikupa"].lower()
+            ]
 
         aktivni_u_filtru = [x for x in filtrirani if x["Status"] != "Storno"]
         storno_u_filtru = [x for x in filtrirani if x["Status"] == "Storno"]
         
-        st.markdown(f"📊 **Statistika:** Ukupno naloga: **{len(filtrirani)}** | Aktivnih za izvršenje: **{len(aktivni_u_filtru)}** | Storniranih: **{len(storno_u_filtru)}**")
+        st.markdown(f"📊 **Statistika prikaza:** Prikazano naloga: **{len(filtrirani)}** | Aktivnih: **{len(aktivni_u_filtru)}** | Storniranih: **{len(storno_u_filtru)}**")
 
         st.divider()
 
@@ -399,9 +458,9 @@ with tab2:
             if za_print:
                 pdf_bytes = generiraj_pdf_makromikro(za_print).getvalue()
                 col_act1.download_button(
-                    label=f"📄 Preuzmi PDF Zahtjev za Transport ({len(za_print)} aktivnih naloga)",
+                    label=f"📄 Preuzmi PDF Zbirni Zahtjev ({len(za_print)} aktivnih naloga)",
                     data=pdf_bytes,
-                    file_name=f"Zahtjev_za_transport_{datetime.now().strftime('%Y-%m-%d')}.pdf",
+                    file_name=f"Zahtjev_za_transport_zbirni_{datetime.now().strftime('%Y-%m-%d')}.pdf",
                     mime="application/pdf",
                     type="primary"
                 )
@@ -412,10 +471,10 @@ with tab2:
                     st.session_state.baza_naloga = ucitaj_naloge()
                     st.rerun()
             else:
-                col_act1.info("Nema aktivnih naloga spremnih za ispis.")
+                col_act1.info("Nema aktivnih naloga spremnih za ispis u ovom filteru.")
 
             if col_act2.button("✅ Označi SVE prikazane aktivne naloge kao PRIKUPLJENO"):
-                sada_str = datetime.now().strftime("%d.%m.%Y. %H:%M")
+                sada_str = f"{datetime.now().strftime('%d.%m.%Y. %H:%M')} (Admin)"
                 brojac = 0
                 for item in filtrirani:
                     if item["Status"] in ["Na čekanju", "Isprintano"]:
@@ -427,7 +486,6 @@ with tab2:
 
             st.divider()
             
-            # Opcija čišćenja baze za admina
             with st.expander("⚠️ Opasna zona / Čišćenje baze"):
                 c_brisi1, c_brisi2 = st.columns(2)
                 if c_brisi1.button("🗑️ Obriši SVE naloge"):
@@ -448,10 +506,10 @@ with tab2:
 
         for i, nalog in enumerate(filtrirani):
             with st.container():
-                c1, c2, c3, c4, c5 = st.columns([1.5, 2, 3, 1.5, 2])
+                c1, c2, c3, c4, c5 = st.columns([1.5, 2, 2.5, 1.5, 2.5])
                 c1.write(f"**{nalog['ID Naloga']}** ({nalog['Tip']})")
                 c2.write(f"👤 {nalog['Komercijalist']}\n📅 {nalog['Datum Prikupa']}")
-                c3.write(f"🏢 **{nalog['Dobavljač']}**\n📍 *Prikup:* {nalog['Adresa Prikupa']}\n📦 {nalog['Opis robe']}")
+                c3.write(f"🏢 **{nalog['Dobavljač']}**\n📍 {nalog['Adresa Prikupa']}\n📦 {nalog['Opis robe']}")
                 
                 st_cls = "status-cekanje" if nalog['Status'] == "Na čekanju" else (
                     "status-isprintano" if nalog['Status'] == "Isprintano" else (
@@ -459,24 +517,45 @@ with tab2:
                     )
                 )
                 c4.markdown(f"<span class='{st_cls}'>{nalog['Status']}</span>", unsafe_allow_html=True)
+                if nalog['Vrijeme Obrade'] != "-":
+                    c4.caption(f" Obrada: {nalog['Vrijeme Obrade']}")
 
-                # Promjena statusa dozvoljena samo ako je admin
-                if st.session_state.user_role == "admin":
-                    trenutni_index = statusi_opcije.index(nalog['Status']) if nalog['Status'] in statusi_opcije else 0
+                # Kolona s akcijama (Promjena statusa / gumbi)
+                with c5:
+                    if st.session_state.user_role == "admin":
+                        trenutni_index = statusi_opcije.index(nalog['Status']) if nalog['Status'] in statusi_opcije else 0
 
-                    novi_status = c5.selectbox(
-                        "Status",
-                        statusi_opcije,
-                        index=trenutni_index,
-                        key=f"status_{nalog['ID Naloga']}_{i}"
+                        novi_status = st.selectbox(
+                            "Status",
+                            statusi_opcije,
+                            index=trenutni_index,
+                            key=f"status_{nalog['ID Naloga']}_{i}"
+                        )
+
+                        if novi_status != nalog['Status']:
+                            vrijeme = f"{datetime.now().strftime('%d.%m.%Y. %H:%M')} (Admin)" if novi_status == "Prikupljeno" else "-"
+                            azuriraj_status_naloga(nalog['ID Naloga'], novi_status, vrijeme)
+                            st.session_state.baza_naloga = ucitaj_naloge()
+                            st.rerun()
+                    else:
+                        st.write("🔒 *Samo pregled*")
+
+                    # Dodatni gumbi (PDF za pojedinačni nalog + Ponovi prikup)
+                    sub_c1, sub_c2 = st.columns(2)
+                    
+                    # Gumb za PDF pojedinačnog naloga
+                    single_pdf_bytes = generiraj_pdf_makromikro([nalog]).getvalue()
+                    sub_c1.download_button(
+                        label="📄 PDF",
+                        data=single_pdf_bytes,
+                        file_name=f"Nalog_{nalog['ID Naloga']}.pdf",
+                        mime="application/pdf",
+                        key=f"pdf_single_{nalog['ID Naloga']}_{i}"
                     )
 
-                    if novi_status != nalog['Status']:
-                        vrijeme = datetime.now().strftime("%d.%m.%Y. %H:%M") if novi_status == "Prikupljeno" else "-"
-                        azuriraj_status_naloga(nalog['ID Naloga'], novi_status, vrijeme)
-                        st.session_state.baza_naloga = ucitaj_naloge()
-                        st.rerun()
-                else:
-                    c5.write("🔒 *Samo pregled*")
+                    # Gumb za ponavljanje prikupa (kopiranje podataka u formu za unos)
+                    if sub_c2.button("🔄 Ponovi", key=f"ponovi_{nalog['ID Naloga']}_{i}"):
+                        st.session_state.ponovi_prikup_data = nalog
+                        st.success("Podaci kopirani! Prebacite se na karticu 'Unos Novog Naloga'.")
 
                 st.markdown("<hr style='margin:8px 0; border:0.5px solid #eee;'>", unsafe_allow_html=True)
