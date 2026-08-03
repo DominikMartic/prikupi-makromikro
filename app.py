@@ -234,6 +234,7 @@ def clean_txt(text):
 
 def generiraj_pdf_makromikro(nalozi_list):
     buffer = io.BytesIO()
+    # A4 širina je 595.27 bodova. S marginama od 35 sa svake strane, raspoloživa širina je 525 bodova.
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
@@ -243,8 +244,8 @@ def generiraj_pdf_makromikro(nalozi_list):
     styles = getSampleStyleSheet()
 
     # Povećane veličine fontova za bolju čitljivost u PDF-u
-    header_title = ParagraphStyle('HeaderTitle', parent=styles['Normal'], fontSize=18, fontName='Helvetica-Bold', textColor=colors.HexColor('#003366'))
-    header_sub = ParagraphStyle('HeaderSub', parent=styles['Normal'], fontSize=10, fontName='Helvetica', textColor=colors.HexColor('#333333'), leading=14)
+    header_title = ParagraphStyle('HeaderTitle', parent=styles['Normal'], fontSize=20, fontName='Helvetica-Bold', textColor=colors.HexColor('#003366'))
+    header_sub = ParagraphStyle('HeaderSub', parent=styles['Normal'], fontSize=10, fontName='Helvetica', textColor=colors.HexColor('#333333'), alignment=2, leading=14)
     doc_title = ParagraphStyle('DocTitle', parent=styles['Heading1'], fontSize=16, fontName='Helvetica-Bold', alignment=1, spaceAfter=15, textColor=colors.HexColor('#003366'))
     
     lbl_style = ParagraphStyle('Lbl', parent=styles['Normal'], fontSize=11, fontName='Helvetica-Bold', leading=15)
@@ -255,24 +256,26 @@ def generiraj_pdf_makromikro(nalozi_list):
     aktivni_nalozi = [n for n in nalozi_list if n['Status'] != 'Storno']
 
     for idx, n in enumerate(aktivni_nalozi):
+        # Logo razvučen preko pune širine stranice (525 bodova) kao uzglavlje
         if putanja_loga:
             try:
-                logo_element = Image(putanja_loga, width=160, height=50)
-                logo_element.hAlign = 'LEFT'
+                logo_element = Image(putanja_loga, width=525, height=70)
+                logo_element.hAlign = 'CENTER'
+                story.append(logo_element)
+                story.append(Spacer(1, 10))
             except Exception:
-                logo_element = Paragraph("<b>makromikro</b><br/><font color='#cc0000'><b>GRUPA</b></font>", header_title)
-        else:
-            logo_element = Paragraph("<b>makromikro</b><br/><font color='#cc0000'><b>GRUPA</b></font>", header_title)
+                pass
 
-        info_text = Paragraph("<b>Makromikro grupa d.o.o.</b><br/>Vukomericka ulica 6,<br/>10410 Velika Gorica, Hrvatska<br/>OIB: 50467974870", header_sub)
+        # Podaci o tvrtki i osnovne info ispod loga preko cijele širine
+        info_text = Paragraph("<b>Makromikro grupa d.o.o.</b><br/>Vukomericka ulica 6, 10410 Velika Gorica, Hrvatska<br/>OIB: 50467974870", header_sub)
         
-        header_table = Table([[logo_element, info_text]], colWidths=[200, 325])
-        header_table.setStyle(TableStyle([
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('ALIGN', (1,0), (1,0), 'RIGHT')
+        info_table = Table([[info_text]], colWidths=[525])
+        info_table.setStyle(TableStyle([
+            ('ALIGN', (0,0), (-1,-1), 'RIGHT'),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 5),
         ]))
-        story.append(header_table)
-        story.append(Spacer(1, 15))
+        story.append(info_table)
+        story.append(Spacer(1, 10))
 
         naslov_dokumenta = f"ZAHTJEV ZA TRANSPORT — {clean_txt(n['Tip']).upper()} ({clean_txt(n['ID Naloga'])})"
         story.append(Paragraph(naslov_dokumenta, doc_title))
@@ -382,14 +385,14 @@ with tab1:
 
             c4, c5 = st.columns(2)
             dobavljac = c4.text_input("Dobavljac / Tvrtka", value=zadati_naziv)
-            kontakt = c5.text_input("Kontakt telefon / Osoba", value=zadati_kontakt if zadati_kontakt != "-" else "")
+            kontakt = c5.text_input("Kontakt telefon / Osoba", value=zadati_kontakt)
 
             c6, c7 = st.columns(2)
-            adresa_prikupa = c6.text_input("Adresa prikupljanja", value=zadana_adresa if zadana_adresa != "-" else "", placeholder="npr. Tina Ujevica 28, Dugo Selo")
+            adresa_prikupa = c6.text_input("Adresa prikupljanja", value=zadana_adresa, placeholder="npr. Tina Ujevica 28, Dugo Selo")
             adresa_dostave = c7.text_input("Adresa dostave", value="Makromikro grupa d.o.o., Vukomericka ulica 6, 10410 Velika Gorica")
 
             opis = st.text_area("Vrsta robe / Opis i kolicina", value=pp_data.get("Opis robe", "") if pp_data else "")
-            napomena = st.text_input("Napomena za vozaca", value=zadana_napomena if zadana_napomena != "-" else "")
+            napomena = st.text_input("Napomena za vozaca", value=zadana_napomena)
 
             submit = st.form_submit_button("Spremi Nalog", type="primary", use_container_width=True)
 
