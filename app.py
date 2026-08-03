@@ -148,7 +148,6 @@ with tab1:
                 prefiks = "PR" if tip == "Prikup" else "POV"
                 id_naloga = f"{prefiks}-2026-{broj:03d}"
                 
-                # Uvijek spremamo sa statusom "Na čekanju"
                 st.session_state.baza_naloga.append({
                     "ID Naloga": id_naloga,
                     "Tip": tip,
@@ -165,7 +164,7 @@ with tab1:
 
 # 2. PREGLED I UPRAVLJANJE
 with tab2:
-    st.subheader("Filtriranje i Upravljanje Nalozi")
+    st.subheader("Filtriranje i Upravljanje Nalozima")
 
     if not st.session_state.baza_naloga:
         st.info("Trenutno nema unesenih naloga u sustavu.")
@@ -175,7 +174,6 @@ with tab2:
         col_f1, col_f2 = st.columns([1, 2])
         odabrani_datum = col_f1.selectbox("Filter po datumu prikupa:", ["Svi datumi"] + sve_datume)
 
-        # Filtriranje liste
         if odabrani_datum == "Svi datumi":
             filtrirani = st.session_state.baza_naloga
         else:
@@ -183,31 +181,33 @@ with tab2:
 
         st.divider()
 
-        # BRZE AKCIJE (PDF & SKUPNI STATUS)
+        # GRUPNE AKCIJE
         st.subheader("Grupne akcije za filtrirane naloge")
         col_act1, col_act2 = st.columns(2)
 
-        # Priprema naloga za print (status Na čekanju)
-        za_print = [x for x in filtrirani if x["Status"] == "Na čekanju"]
+        # Nalazi za print (Bilo da su 'Na čekanju' ili već 'Isprintano')
+        za_print = [x for x in filtrirani if x["Status"] in ["Na čekanju", "Isprintano"]]
 
         if za_print:
-            pdf_data = generiraj_pdf(za_print)
+            # Generiranje čistog PDF stream-a bez on_click greške
+            pdf_bytes = generiraj_pdf(za_print).getvalue()
             
-            # Gumb koji preuzima PDF i automatski mijenja status u "Isprintano"
-            def oznaci_isprintano():
-                for item in za_print:
-                    item["Status"] = "Isprintano"
-
-            col_act1.download_button(
-                label=f"📄 Preuzmi PDF sa svim nalozi 'Na čekanju' ({len(za_print)})",
-                data=pdf_data,
+            btn_download = col_act1.download_button(
+                label=f"📄 Preuzmi PDF za print ({len(za_print)} naloga)",
+                data=pdf_bytes,
                 file_name=f"NALOZI_{datetime.now().strftime('%Y-%m-%d')}.pdf",
                 mime="application/pdf",
-                on_click=oznaci_isprintano,
                 type="primary"
             )
+
+            # Ako želiš jednim klikom naknadno staviti status "Isprintano"
+            if col_act1.button("✏️ Označi ove naloge kao 'Isprintano'"):
+                for item in za_print:
+                    if item["Status"] == "Na čekanju":
+                        item["Status"] = "Isprintano"
+                st.rerun()
         else:
-            col_act1.info("Nema naloga 'Na čekanju' za generiranje PDF-a.")
+            col_act1.info("Nema aktivnih naloga za generiranje PDF-a.")
 
         # Gumb za označavanje svih na kraju dana
         if col_act2.button("✅ Označi SVE prikazane naloge kao PRIKUPLJENO"):
@@ -223,7 +223,7 @@ with tab2:
 
         st.divider()
 
-        # DETAIL TABLICA S POJEDINAČNIM UPRAVLJANJEM STATUSIMA
+        # POJEDINAČNI PRIKAZ I POPRAVAK STATUSIMA
         st.subheader("Pojedinačne postavke naloga")
         
         for i, nalog in enumerate(filtrirani):
@@ -237,7 +237,7 @@ with tab2:
                 st_cls = "status-cekanje" if nalog['Status'] == "Na čekanju" else ("status-isprintano" if nalog['Status'] == "Isprintano" else "status-prikupljeno")
                 c4.markdown(f"<span class='{st_cls}'>{nalog['Status']}</span>", unsafe_allow_html=True)
 
-                # Pojedinačna promjena statusa
+                # Pojedinačni drop-down za promjenu statusa
                 novi_status = c5.selectbox(
                     "Status",
                     ["Na čekanju", "Isprintano", "Prikupljeno"],
