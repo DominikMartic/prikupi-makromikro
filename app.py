@@ -144,14 +144,14 @@ if "ponovi_prikup_data" not in st.session_state:
 
 query_params = st.query_params
 
-# Automatska prijava putem QR linka ili query parametra
-if not st.session_state.is_logged_in and "role" in query_params:
-    st.session_state.is_logged_in = True
-    st.session_state.user_role = query_params["role"]
-elif not st.session_state.is_logged_in and "search" in query_params:
-    # Ako netko skenira QR kod bez prijave, automatski ih pustimo kao komercijalista/admina da vide nalog
-    st.session_state.is_logged_in = True
-    st.session_state.user_role = "admin"
+# Automatska prijava putem QR linka ili query parametra (preskače lozinku pri skeniranju)
+if not st.session_state.is_logged_in:
+    if "role" in query_params:
+        st.session_state.is_logged_in = True
+        st.session_state.user_role = query_params["role"]
+    elif "search" in query_params:
+        st.session_state.is_logged_in = True
+        st.session_state.user_role = "admin"
 
 # --- MODERNI AI / SAAS CSS STILOVI ---
 st.markdown("""
@@ -287,9 +287,9 @@ def generiraj_pdf_makromikro(nalozi_list):
         naslov_tekst = f"ZAHTJEV ZA TRANSPORT — {clean_txt(n['Tip']).upper()} ({id_naloga_txt})"
         p_naslov = Paragraph(naslov_tekst, doc_title)
 
-        # Generiranje pravog web linka u QR kodu koji vodi direktno na aplikaciju i pretražuje nalog
+        # Generiranje linka s ugrađenom automatskom prijavom i pretragom naloga
         try:
-            qr_link = f"{APP_URL}/?search={n['ID Naloga']}"
+            qr_link = f"{APP_URL}/?search={n['ID Naloga']}&role=admin"
             qr_buf = generiraj_qr_sliku(qr_link)
             qr_img = Image(qr_buf, width=45, height=45)
             qr_img.hAlign = 'RIGHT'
