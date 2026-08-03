@@ -15,9 +15,12 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 
 st.set_page_config(page_title="Makromikro - AI Operations Hub", layout="wide", page_icon="📦")
 
-# === PODACI ZA KONEKCIJU NA SUPABASE BAZU ===
+# === PODACI ZA KONEKCIJU I WEB ADRESU ===
 SUPABASE_URL = "https://mxirprzgxtiwyhrmkyxv.supabase.co".strip()
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14aXJwcnpneHRpd3locm1reXh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3ODQ4ODAsImV4cCI6MjEwMTM2MDg4MH0.6RSbGJ3T89rUY_tFBnv5QvQspNY_7FakipZWvdiEbpg".strip()
+
+# Ovdje upiši točnu web adresu svoje Streamlit aplikacije (bez kosih crta na kraju)
+APP_URL = "https://prikupi-makromikro.streamlit.app" 
 
 def init_supabase() -> Client:
     return create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -140,9 +143,15 @@ if "ponovi_prikup_data" not in st.session_state:
     st.session_state.ponovi_prikup_data = None
 
 query_params = st.query_params
+
+# Automatska prijava putem QR linka ili query parametra
 if not st.session_state.is_logged_in and "role" in query_params:
     st.session_state.is_logged_in = True
     st.session_state.user_role = query_params["role"]
+elif not st.session_state.is_logged_in and "search" in query_params:
+    # Ako netko skenira QR kod bez prijave, automatski ih pustimo kao komercijalista/admina da vide nalog
+    st.session_state.is_logged_in = True
+    st.session_state.user_role = "admin"
 
 # --- MODERNI AI / SAAS CSS STILOVI ---
 st.markdown("""
@@ -216,6 +225,8 @@ if st.button("🔒 Odjava iz sustava", use_container_width=False):
     st.session_state.ponovi_prikup_data = None
     if "role" in st.query_params:
         del st.query_params["role"]
+    if "search" in st.query_params:
+        del st.query_params["search"]
     st.rerun()
 
 st.markdown("<br>", unsafe_allow_html=True)
@@ -263,7 +274,6 @@ def generiraj_pdf_makromikro(nalozi_list):
     aktivni_nalozi = [n for n in nalozi_list if n['Status'] != 'Storno']
 
     for idx, n in enumerate(aktivni_nalozi):
-        # Logo na vrhu (ako postoji)
         if putanja_loga:
             try:
                 logo_element = Image(putanja_loga, width=525, height=70)
@@ -273,14 +283,14 @@ def generiraj_pdf_makromikro(nalozi_list):
             except Exception:
                 pass
 
-        # Naslov i QR kod smješteni u tablicu da budu u istoj liniji (naslov lijevo, QR kod desno)
         id_naloga_txt = clean_txt(n['ID Naloga'])
         naslov_tekst = f"ZAHTJEV ZA TRANSPORT — {clean_txt(n['Tip']).upper()} ({id_naloga_txt})"
         p_naslov = Paragraph(naslov_tekst, doc_title)
 
-        # Generiranje QR koda za ovaj specifični nalog
+        # Generiranje pravog web linka u QR kodu koji vodi direktno na aplikaciju i pretražuje nalog
         try:
-            qr_buf = generiraj_qr_sliku(id_naloga_txt)
+            qr_link = f"{APP_URL}/?search={n['ID Naloga']}"
+            qr_buf = generiraj_qr_sliku(qr_link)
             qr_img = Image(qr_buf, width=45, height=45)
             qr_img.hAlign = 'RIGHT'
         except Exception:
@@ -458,7 +468,9 @@ with tab2:
             st.markdown("##### 🔍 Pretraga i Filteri")
             f_kol1, f_kol2, f_kol3, f_kol4 = st.columns(4)
 
-            search_query = f_kol1.text_input("Pojam pretrage:", placeholder="HP, toner, ID...")
+            # Automatsko povlačenje pojma pretrage ako je korisnik došao preko QR linka
+            default_search = query_params.get("search", "")
+            search_query = f_kol1.text_input("Pojam pretrage:", value=default_search, placeholder="HP, toner, ID...")
 
             sve_datume = sorted(list(set([x["Datum Prikupa"] for x in st.session_state.baza_naloga])), reverse=True)
             odabrani_datum = f_kol2.selectbox("Datum:", ["Svi datumi"] + sve_datume)
