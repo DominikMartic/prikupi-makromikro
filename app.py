@@ -26,7 +26,7 @@ try:
 except Exception as e:
     supabase = None
 
-# --- SPREMANJE I UČITAVANJE IZ TRAJNE BAZE ---
+# --- SPREMANJE I UCITAVANJE IZ TRAJNE BAZE ---
 def ucitaj_naloge():
     if supabase:
         try:
@@ -39,7 +39,7 @@ def ucitaj_naloge():
                     "Tip": r.get("tip", "-"),
                     "Komercijalist": r.get("komercijalist", "-"),
                     "Datum Prikupa": r.get("datum_prikupa", "-"),
-                    "Dobavljač": r.get("dobavljac", "-"),
+                    "Dobavljac": r.get("dobavljac", "-"),
                     "Kontakt": r.get("kontakt", "-"),
                     "Adresa Prikupa": r.get("adresa_prikupa", "-"),
                     "Adresa Dostave": r.get("adresa_dostave", "-"),
@@ -64,7 +64,7 @@ def ucitaj_dobavljace():
     return {}
 
 def spremi_ili_azuriraj_dobavljaca(naziv, kontakt, adresa, napomena):
-    if supabase and naziv and naziv != "Novi dobavljač...":
+    if supabase and naziv and naziv != "Novi dobavljac...":
         try:
             podaci = {
                 "naziv": naziv.strip(),
@@ -74,7 +74,7 @@ def spremi_ili_azuriraj_dobavljaca(naziv, kontakt, adresa, napomena):
             }
             supabase.table("dobavljaci").upsert(podaci, on_conflict="naziv").execute()
         except Exception as e:
-            st.error(f"Greška pri spremanju dobavljača: {e}")
+            st.error(f"Greska pri spremanju dobavljaca: {e}")
 
 def spremi_novi_nalog(n):
     if supabase:
@@ -84,7 +84,7 @@ def spremi_novi_nalog(n):
                 "tip": n["Tip"],
                 "komercijalist": n["Komercijalist"],
                 "datum_prikupa": n["Datum Prikupa"],
-                "dobavljac": n["Dobavljač"],
+                "dobavljac": n["Dobavljac"],
                 "kontakt": n["Kontakt"],
                 "adresa_prikupa": n["Adresa Prikupa"],
                 "adresa_dostave": n["Adresa Dostave"],
@@ -94,9 +94,9 @@ def spremi_novi_nalog(n):
                 "vrijeme_obrade": n["Vrijeme Obrade"]
             }
             supabase.table("nalozi").insert(data).execute()
-            spremi_ili_azuriraj_dobavljaca(n["Dobavljač"], n["Kontakt"], n["Adresa Prikupa"], n["Napomena"])
+            spremi_ili_azuriraj_dobavljaca(n["Dobavljac"], n["Kontakt"], n["Adresa Prikupa"], n["Napomena"])
         except Exception as e:
-            st.error(f"Greška pri spremanju u bazu: {e}")
+            st.error(f"Greska pri spremanju u bazu: {e}")
 
 def azuriraj_status_naloga(id_naloga, novi_status, vrijeme_obrade="-"):
     if supabase:
@@ -106,21 +106,21 @@ def azuriraj_status_naloga(id_naloga, novi_status, vrijeme_obrade="-"):
                 "vrijeme_obrade": vrijeme_obrade
             }).eq("id", id_naloga).execute()
         except Exception as e:
-            st.error(f"Greška pri ažuriranju: {e}")
+            st.error(f"Greska pri azuriranju: {e}")
 
 def obrisi_sve_naloge():
     if supabase:
         try:
-            supabase.table("nalozi").delete().neq("id", "NEPOSTOJEĆI_ID").execute()
+            supabase.table("nalozi").delete().neq("id", "NEPOSTOJECI_ID").execute()
         except Exception as e:
-            st.error(f"Greška pri brisanju naloga: {e}")
+            st.error(f"Greska pri brisanju naloga: {e}")
 
 def obrisi_sve_dobavljace():
     if supabase:
         try:
-            supabase.table("dobavljaci").delete().neq("naziv", "NEPOSTOJEĆI_NAZIV").execute()
+            supabase.table("dobavljaci").delete().neq("naziv", "NEPOSTOJECI_NAZIV").execute()
         except Exception as e:
-            st.error(f"Greška pri brisanju dobavljača: {e}")
+            st.error(f"Greska pri brisanju dobavljaca: {e}")
 
 # Inicijalizacija sesije
 if "baza_naloga" not in st.session_state:
@@ -146,16 +146,13 @@ if not st.session_state.is_logged_in and "role" in query_params:
 # --- MODERNI AI / SAAS CSS STILOVI ---
 st.markdown("""
     <style>
-    /* Glavni kontejner i font */
     .block-container { padding-top: 2rem; padding-bottom: 3rem; }
     
-    /* Moderne badge oznake statusa */
     .ai-badge-cekanje { background: rgba(245, 158, 11, 0.1); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.2); padding: 4px 10px; border-radius: 20px; font-weight: 600; font-size: 0.75rem; }
     .ai-badge-isprintano { background: rgba(14, 165, 233, 0.1); color: #0284c7; border: 1px solid rgba(14, 165, 233, 0.2); padding: 4px 10px; border-radius: 20px; font-weight: 600; font-size: 0.75rem; }
     .ai-badge-prikupljeno { background: rgba(34, 197, 94, 0.1); color: #16a34a; border: 1px solid rgba(34, 197, 94, 0.2); padding: 4px 10px; border-radius: 20px; font-weight: 600; font-size: 0.75rem; }
     .ai-badge-storno { background: rgba(239, 68, 68, 0.1); color: #dc2626; border: 1px solid rgba(239, 68, 68, 0.2); padding: 4px 10px; border-radius: 20px; font-weight: 600; font-size: 0.75rem; text-decoration: line-through; }
 
-    /* Elegantna zaglavlja i status traka */
     .ai-header-box {
         display: flex;
         align-items: center;
@@ -179,7 +176,7 @@ if not st.session_state.is_logged_in:
             st.markdown("### ✨ Makromikro AI Hub")
             st.caption("Prijavite se za pristup sustavu transportnih naloga")
             unesena_lozinka = st.text_input("Pristupna lozinka:", type="password")
-            zapamti_me = st.checkbox("Zapamti me na ovom uređaju")
+            zapamti_me = st.checkbox("Zapamti me na ovom uredaju")
             
             if st.button("Pokreni aplikaciju", type="primary", use_container_width=True):
                  odabrana_uloga = None
@@ -195,10 +192,10 @@ if not st.session_state.is_logged_in:
                          st.query_params["role"] = odabrana_uloga
                      st.rerun()
                  else:
-                     st.error("Pogrešna lozinka!")
+                     st.error("Pogresna lozinka!")
     st.stop()
 
-# --- GLAVNI DIO APLIKACIJE (AI SaaS Header) ---
+# --- GLAVNI DIO APLIKACIJE ---
 role_display = st.session_state.user_role.upper()
 st.markdown(f"""
     <div class="ai-header-box">
@@ -212,7 +209,6 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# Gumb za odjavu izvučen izvan HTML-a radi ispravnog Streamlit ponašanja
 if st.button("🔒 Odjava iz sustava", use_container_width=False):
     st.session_state.is_logged_in = False
     st.session_state.user_role = None
@@ -267,7 +263,7 @@ def generiraj_pdf_makromikro(nalozi_list):
         else:
             logo_element = Paragraph("<b>makromikro</b><br/><font color='#cc0000'><b>GRUPA</b></font>", header_title)
 
-        info_text = Paragraph("<b>Makromikro grupa d.o.o.</b><br/>Vukomerička ulica 6,<br/>10410 Velika Gorica, Hrvatska<br/>OIB: 50467974870", header_sub)
+        info_text = Paragraph("<b>Makromikro grupa d.o.o.</b><br/>Vukomericka ulica 6,<br/>10410 Velika Gorica, Hrvatska<br/>OIB: 50467974870", header_sub)
         
         header_table = Table([[logo_element, info_text]], colWidths=[200, 325])
         header_table.setStyle(TableStyle([
@@ -283,11 +279,11 @@ def generiraj_pdf_makromikro(nalozi_list):
         podaci = [
             [Paragraph("Podnositelj zahtjeva:", lbl_style), Paragraph(clean_txt(n['Komercijalist']), val_style)],
             [Paragraph("Datum i vrijeme:", lbl_style), Paragraph(clean_txt(n['Datum Prikupa']), val_style)],
-            [Paragraph("Dobavljač / Kontakt:", lbl_style), Paragraph(f"<b>{clean_txt(n['Dobavljač'])}</b> ({clean_txt(n['Kontakt'])})", val_style)],
+            [Paragraph("Dobavljac / Kontakt:", lbl_style), Paragraph(f"<b>{clean_txt(n['Dobavljac'])}</b> ({clean_txt(n['Kontakt'])})", val_style)],
             [Paragraph("Adresa prikupljanja:", lbl_style), Paragraph(clean_txt(n['Adresa Prikupa']), val_style)],
             [Paragraph("Adresa dostave (Mjesto otpreme):", lbl_style), Paragraph(clean_txt(n['Adresa Dostave']), val_style)],
             [Paragraph("Vrsta robe / Opis:", lbl_style), Paragraph(clean_txt(n['Opis robe']), val_style)],
-            [Paragraph("Napomena za vozača:", lbl_style), Paragraph(clean_txt(n['Napomena']), val_style)],
+            [Paragraph("Napomena za vozaca:", lbl_style), Paragraph(clean_txt(n['Napomena']), val_style)],
         ]
 
         t_podaci = Table(podaci, colWidths=[160, 365])
@@ -300,11 +296,11 @@ def generiraj_pdf_makromikro(nalozi_list):
         story.append(t_podaci)
         story.append(Spacer(1, 15))
 
-        story.append(Paragraph("- ispunjava vozač", sec_hdr))
+        story.append(Paragraph("- ispunjava vozac", sec_hdr))
         story.append(Spacer(1, 3))
         
         vozac_data = [
-            [Paragraph("Prijevoz je izvršio (ime i prezime vozača):", val_style), Paragraph("Datum:", val_style), Paragraph("Potpis:", val_style)],
+            [Paragraph("Prijevoz je izvrsio (ime i prezime vozaca):", val_style), Paragraph("Datum:", val_style), Paragraph("Potpis:", val_style)],
             ["\n", "", ""]
         ]
         t_vozac = Table(vozac_data, colWidths=[240, 140, 145])
@@ -317,7 +313,7 @@ def generiraj_pdf_makromikro(nalozi_list):
         story.append(t_vozac)
         story.append(Spacer(1, 15))
 
-        story.append(Paragraph("- ispunjava skladištar na prijemu robe u skladištu", sec_hdr))
+        story.append(Paragraph("- ispunjava skladistar na prijemu robe u skladistu", sec_hdr))
         story.append(Spacer(1, 3))
         
         skladiste_data = [
@@ -351,24 +347,24 @@ with tab1:
         st.info(f"🔄 Učitani podaci za ponovljeni prikup iz naloga **{pp_data.get('ID Naloga', '')}**")
 
     dobavljaci_dict = st.session_state.baza_dobavljaca
-    lista_dobavljaca = ["Novi dobavljač..."] + sorted(list(dobavljaci_dict.keys()))
+    lista_dobavljaca = ["Novi dobavljac..."] + sorted(list(dobavljaci_dict.keys()))
 
     c_dob1, c_dob2 = st.columns([1, 1])
     
     default_dob_index = 0
-    if pp_data and pp_data.get("Dobavljač") in lista_dobavljaca:
-        default_dob_index = lista_dobavljaca.index(pp_data.get("Dobavljač"))
+    if pp_data and pp_data.get("Dobavljac") in lista_dobavljaca:
+        default_dob_index = lista_dobavljaca.index(pp_data.get("Dobavljac"))
 
-    odabrani_dobavljac_opcija = c_dob1.selectbox("Odaberi postojećeg dobavljača (ili unesi novog):", lista_dobavljaca, index=default_dob_index)
+    odabrani_dobavljac_opcija = c_dob1.selectbox("Odaberi postojeceg dobavljaca (ili unesi novog):", lista_dobavljaca, index=default_dob_index)
 
-    if odabrani_dobavljac_opcija != "Novi dobavljač...":
+    if odabrani_dobavljac_opcija != "Novi dobavljac...":
         podaci_dob = dobavljaci_dict.get(odabrani_dobavljac_opcija, {})
         zadati_naziv = odabrani_dobavljac_opcija
         zadati_kontakt = podaci_dob.get("kontakt", "")
         zadana_adresa = podaci_dob.get("adresa_prikupa", "")
         zadana_napomena = podaci_dob.get("napomena", "")
     else:
-        zadati_naziv = pp_data.get("Dobavljač", "") if pp_data else ""
+        zadati_naziv = pp_data.get("Dobavljac", "") if pp_data else ""
         zadati_kontakt = pp_data.get("Kontakt", "") if pp_data else ""
         zadana_adresa = pp_data.get("Adresa Prikupa", "") if pp_data else ""
         zadana_napomena = pp_data.get("Napomena", "") if pp_data else ""
@@ -384,21 +380,21 @@ with tab1:
             datum = c3.date_input("Datum prikupa", datetime.now())
 
             c4, c5 = st.columns(2)
-            dobavljac = c4.text_input("Dobavljač / Tvrtka", value=zadati_naziv)
+            dobavljac = c4.text_input("Dobavljac / Tvrtka", value=zadati_naziv)
             kontakt = c5.text_input("Kontakt telefon / Osoba", value=zadati_kontakt if zadati_kontakt != "-" else "")
 
             c6, c7 = st.columns(2)
-            adresa_prikupa = c6.text_input("Adresa prikupljanja", value=zadana_adresa if zadana_adresa != "-" else "", placeholder="npr. Tina Ujevića 28, Dugo Selo")
-            adresa_dostave = c7.text_input("Adresa dostave", value="Makromikro grupa d.o.o., Vukomerička ulica 6, 10410 Velika Gorica")
+            adresa_prikupa = c6.text_input("Adresa prikupljanja", value=zadana_adresa if zadana_adresa != "-" else "", placeholder="npr. Tina Ujevica 28, Dugo Selo")
+            adresa_dostave = c7.text_input("Adresa dostave", value="Makromikro grupa d.o.o., Vukomericka ulica 6, 10410 Velika Gorica")
 
-            opis = st.text_area("Vrsta robe / Opis i količina", value=pp_data.get("Opis robe", "") if pp_data else "")
-            napomena = st.text_input("Napomena za vozača", value=zadana_napomena if zadana_napomena != "-" else "")
+            opis = st.text_area("Vrsta robe / Opis i kolicina", value=pp_data.get("Opis robe", "") if pp_data else "")
+            napomena = st.text_input("Napomena za vozaca", value=zadana_napomena if zadana_napomena != "-" else "")
 
             submit = st.form_submit_button("Spremi Nalog", type="primary", use_container_width=True)
 
             if submit:
                 if not komercijalist or not dobavljac or not adresa_prikupa or not opis:
-                    st.error("Podnositelj, Dobavljač, Adresa prikupljanja i Vrsta robe su obavezni!")
+                    st.error("Podnositelj, Dobavljac, Adresa prikupljanja i Vrsta robe su obavezni!")
                 else:
                     broj = len(st.session_state.baza_naloga) + 1
                     prefiks = "PR" if tip == "Prikup" else "POV"
@@ -409,30 +405,30 @@ with tab1:
                         "Tip": tip,
                         "Komercijalist": komercijalist,
                         "Datum Prikupa": datum.strftime("%Y-%m-%d"),
-                        "Dobavljač": dobavljac,
+                        "Dobavljac": dobavljac,
                         "Kontakt": kontakt or "-",
                         "Adresa Prikupa": adresa_prikupa,
                         "Adresa Dostave": adresa_dostave,
                         "Opis robe": opis,
                         "Napomena": napomena or "-",
-                        "Status": "Na čekanju",
+                        "Status": "Na cekanju",
                         "Vrijeme Obrade": "-"
                     }
                     spremi_novi_nalog(novi_nalog)
                     st.session_state.baza_naloga = ucitaj_naloge()
                     st.session_state.baza_dobavljaca = ucitaj_dobavljace()
                     st.session_state.ponovi_prikup_data = None
-                    st.success(f"Nalog {id_naloga} uspješno spremljen! Podaci o dobavljaču zapamćeni za ubuduće.")
+                    st.success(f"Nalog {id_naloga} uspjesno spremljen! Podaci o dobavljacu zapamceni za ubuduce.")
 
     if pp_data:
-        if st.button("❌ Poništi ponovljeni unos"):
+        if st.button("❌ Ponisti ponovljeni unos"):
             st.session_state.ponovi_prikup_data = None
             st.rerun()
 
 with tab2:
     col_h1, col_h2 = st.columns([3, 1])
     col_h1.subheader("📋 Upravljanje transportnim nalozima")
-    if col_h2.button("🔄 Osvježi podatke", use_container_width=True):
+    if col_h2.button("🔄 Osvjezi podatke", use_container_width=True):
         st.session_state.baza_naloga = ucitaj_naloge()
         st.session_state.baza_dobavljaca = ucitaj_dobavljace()
         st.rerun()
@@ -452,8 +448,8 @@ with tab2:
             svi_komercijalisti = sorted(list(set([x["Komercijalist"] for x in st.session_state.baza_naloga])))
             odabrani_komercijalist = f_kol3.selectbox("Komercijalist:", ["Svi"] + svi_komercijalisti)
 
-            svi_dobavljaci_lista = sorted(list(set([x["Dobavljač"] for x in st.session_state.baza_naloga])))
-            odabrani_dobavljac_filter = f_kol4.selectbox("Dobavljač:", ["Svi"] + svi_dobavljaci_lista)
+            svi_dobavljaci_lista = sorted(list(set([x["Dobavljac"] for x in st.session_state.baza_naloga])))
+            odabrani_dobavljac_filter = f_kol4.selectbox("Dobavljac:", ["Svi"] + svi_dobavljaci_lista)
 
         filtrirani = st.session_state.baza_naloga
 
@@ -464,14 +460,14 @@ with tab2:
             filtrirani = [x for x in filtrirani if x["Komercijalist"] == odabrani_komercijalist]
 
         if odabrani_dobavljac_filter != "Svi":
-            filtrirani = [x for x in filtrirani if x["Dobavljač"] == odabrani_dobavljac_filter]
+            filtrirani = [x for x in filtrirani if x["Dobavljac"] == odabrani_dobavljac_filter]
 
         if search_query:
             sq = search_query.lower()
             filtrirani = [
                 x for x in filtrirani if 
                 sq in x["ID Naloga"].lower() or 
-                sq in x["Dobavljač"].lower() or 
+                sq in x["Dobavljac"].lower() or 
                 sq in x["Opis robe"].lower() or 
                 sq in x["Komercijalist"].lower() or
                 sq in x["Adresa Prikupa"].lower()
@@ -480,7 +476,6 @@ with tab2:
         aktivni_u_filtru = [x for x in filtrirani if x["Status"] != "Storno"]
         storno_u_filtru = [x for x in filtrirani if x["Status"] == "Storno"]
         
-        # Prikaz modernih metrika
         m1, m2, m3 = st.columns(3)
         m1.metric("Ukupno u prikazu", len(filtrirani))
         m2.metric("Aktivni nalozi", len(aktivni_u_filtru))
@@ -490,7 +485,7 @@ with tab2:
 
         if st.session_state.user_role == "admin":
             col_act1, col_act2 = st.columns(2)
-            za_print = [x for x in filtrirani if x["Status"] in ["Na čekanju", "Isprintano"]]
+            za_print = [x for x in filtrirani if x["Status"] in ["Na cekanju", "Isprintano"]]
 
             if za_print:
                 pdf_bytes = generiraj_pdf_makromikro(za_print).getvalue()
@@ -502,45 +497,44 @@ with tab2:
                     type="primary",
                     use_container_width=True
                 )
-                if col_act1.button("✏️ Označi ove naloge kao 'Isprintano'", use_container_width=True):
+                if col_act1.button("✏️ Oznaci ove naloge kao 'Isprintano'", use_container_width=True):
                     for item in za_print:
-                        if item["Status"] == "Na čekanju":
+                        if item["Status"] == "Na cekanju":
                             azuriraj_status_naloga(item["ID Naloga"], "Isprintano")
                     st.session_state.baza_naloga = ucitaj_naloge()
                     st.rerun()
             else:
                 col_act1.info("Nema aktivnih naloga spremnih za ispis u ovom filteru.")
 
-            if col_act2.button("✅ Označi SVE prikazane aktivne naloge kao PRIKUPLJENO", use_container_width=True):
+            if col_act2.button("✅ Oznaci SVE prikazane aktivne naloge kao PRIKUPLJENO", use_container_width=True):
                 sada_str = f"{datetime.now().strftime('%d.%m.%Y. %H:%M')} (Admin)"
                 brojac = 0
                 for item in filtrirani:
-                    if item["Status"] in ["Na čekanju", "Isprintano"]:
+                    if item["Status"] in ["Na cekanju", "Isprintano"]:
                         azuriraj_status_naloga(item["ID Naloga"], "Prikupljeno", sada_str)
                         brojac += 1
                 st.session_state.baza_naloga = ucitaj_naloge()
                 st.success(f"Status promijenjen u 'Prikupljeno' za {brojac} naloga!")
                 st.rerun()
 
-            with st.expander("⚠️ Napredno / Čišćenje baze (Admin zona)"):
+            with st.expander("⚠️ Napredno / Ciscenje baze (Admin zona)"):
                 c_brisi1, c_brisi2 = st.columns(2)
-                if c_brisi1.button("🗑️ Obriši SVE naloge"):
+                if c_brisi1.button("🗑️ Obrisi SVE naloge"):
                     if st.checkbox("Potvrdi brisanje naloga", key="p_nalozi"):
                         obrisi_sve_naloge()
                         st.session_state.baza_naloga = ucitaj_naloge()
                         st.success("Nalozi obrisani!")
                         st.rerun()
-                if c_brisi2.button("🗑️ Obriši SVE dobavljače"):
-                    if st.checkbox("Potvrdi brisanje dobavljača", key="p_dob"):
+                if c_brisi2.button("🗑️ Obrisi SVE dobavljace"):
+                    if st.checkbox("Potvrdi brisanje dobavljaca", key="p_dob"):
                         obrisi_sve_dobavljace()
                         st.session_state.baza_dobavljaca = ucitaj_dobavljace()
-                        st.success("Dobavljači obrisani!")
+                        st.success("Dobavljaci obrisani!")
                         st.rerun()
             st.divider()
 
-        statusi_opcije = ["Na čekanju", "Isprintano", "Prikupljeno", "Storno"]
+        statusi_opcije = ["Na cekanju", "Isprintano", "Prikupljeno", "Storno"]
 
-        # Prikaz svake stavke unutar vizualne kartice
         for i, nalog in enumerate(filtrirani):
             with st.container(border=True):
                 c1, c2, c3, c4, c5 = st.columns([1.2, 1.8, 2.5, 1.5, 2.2])
@@ -551,18 +545,18 @@ with tab2:
                 c2.markdown(f"👤 **{nalog['Komercijalist']}**")
                 c2.caption(f"📅 {nalog['Datum Prikupa']}")
                 
-                c3.markdown(f"🏢 **{nalog['Dobavljač']}**")
+                c3.markdown(f"🏢 **{nalog['Dobavljac']}**")
                 c3.markdown(f"📍 _{nalog['Adresa Prikupa']}_")
                 c3.caption(f"📦 {nalog['Opis robe']}")
                 
-                st_cls = "ai-badge-cekanje" if nalog['Status'] == "Na čekanju" else (
+                st_cls = "ai-badge-cekanje" if nalog['Status'] == "Na cekanju" else (
                     "ai-badge-isprintano" if nalog['Status'] == "Isprintano" else (
                         "ai-badge-prikupljeno" if nalog['Status'] == "Prikupljeno" else "ai-badge-storno"
                     )
                 )
                 c4.markdown(f"<span class='{st_cls}'>{nalog['Status']}</span>", unsafe_allow_html=True)
                 if nalog['Vrijeme Obrade'] != "-":
-                    c4.caption(f" Obrada: {nalog['Vrijeme Obrade']}")
+                    c4.caption(f"Obrada: {nalog['Vrijeme Obrade']}")
 
                 with c5:
                     if st.session_state.user_role == "admin":
