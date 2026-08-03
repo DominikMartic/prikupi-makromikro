@@ -19,7 +19,7 @@ st.set_page_config(page_title="Makromikro - AI Operations Hub", layout="wide", p
 SUPABASE_URL = "https://mxirprzgxtiwyhrmkyxv.supabase.co".strip()
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14aXJwcnpneHRpd3locm1reXh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3ODQ4ODAsImV4cCI6MjEwMTM2MDg4MH0.6RSbGJ3T89rUY_tFBnv5QvQspNY_7FakipZWvdiEbpg".strip()
 
-# Ovdje upiši točnu web adresu svoje Streamlit aplikacije (bez kosih crta na kraju)
+# Točna web adresa tvoje Streamlit aplikacije
 APP_URL = "https://prikupi-makromikro.streamlit.app" 
 
 def init_supabase() -> Client:
@@ -142,11 +142,11 @@ if "user_role" not in st.session_state:
 if "ponovi_prikup_data" not in st.session_state:
     st.session_state.ponovi_prikup_data = None
 
-# --- ODMAH PROVJERI QUERY PARAMETRE (QR KOD / AUTO-LOGIN) ---
+# --- AUTOMATSKA PROVJERA PARAMETARA NA SAMOM VRHU ---
 query_params = st.query_params
 
-# Ako u linku postoji 'search' (skeniran QR kod) ili 'role', automatski daj pristup admina bez lozinke
-if "search" in query_params or "role" in query_params:
+# Ako u linku postoji bilo kakav parametar (search ili role), automatski prijavi korisnika
+if len(query_params) > 0:
     st.session_state.is_logged_in = True
     st.session_state.user_role = query_params.get("role", "admin")
 
@@ -174,18 +174,26 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- SUSTAV ZA PRIJAVU ---
+# --- SUSTAV ZA PRIJAVU S BRZIM GUMBOM ---
 if not st.session_state.is_logged_in:
     c_l1, c_l2, c_l3 = st.columns([1, 1.2, 1])
     with c_l2:
         st.markdown("<br><br>", unsafe_allow_html=True)
         with st.container(border=True):
             st.markdown("### ✨ Makromikro AI Hub")
-            st.caption("Prijavite se za pristup sustavu transportnih naloga")
-            unesena_lozinka = st.text_input("Pristupna lozinka:", type="password")
-            zapamti_me = st.checkbox("Zapamti me na ovom uredaju")
+            st.caption("Pristup transportnim nalozima i WMS logistici")
             
-            if st.button("Pokreni aplikaciju", type="primary", use_container_width=True):
+            # BRZI GUMB ZA MOBITELE / SKLADIŠTE (Bez tipkanja lozinke!)
+            if st.button("🚀 Brzi ulaz (Skladište / Vozač / Pregled)", type="primary", use_container_width=True):
+                st.session_state.is_logged_in = True
+                st.session_state.user_role = "admin"
+                st.rerun()
+
+            st.divider()
+            st.caption("Ili se prijavite s lozinkom:")
+            unesena_lozinka = st.text_input("Pristupna lozinka:", type="password")
+            
+            if st.button("Prijava lozinkom", use_container_width=True):
                  odabrana_uloga = None
                  if unesena_lozinka == "admin123":
                      odabrana_uloga = "admin"
@@ -195,8 +203,6 @@ if not st.session_state.is_logged_in:
                  if odabrana_uloga:
                      st.session_state.is_logged_in = True
                      st.session_state.user_role = odabrana_uloga
-                     if zapamti_me:
-                         st.query_params["role"] = odabrana_uloga
                      st.rerun()
                  else:
                      st.error("Pogresna lozinka!")
@@ -284,7 +290,7 @@ def generiraj_pdf_makromikro(nalozi_list):
         naslov_tekst = f"ZAHTJEV ZA TRANSPORT — {clean_txt(n['Tip']).upper()} ({id_naloga_txt})"
         p_naslov = Paragraph(naslov_tekst, doc_title)
 
-        # Generiranje linka s ugrađenom automatskom prijavom i pretragom naloga
+        # Generiranje linka za QR kod
         try:
             qr_link = f"{APP_URL}/?search={n['ID Naloga']}&role=admin"
             qr_buf = generiraj_qr_sliku(qr_link)
