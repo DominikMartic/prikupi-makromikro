@@ -2,12 +2,13 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import io
+import html  # Za sigurno pretvaranje specijalnih znakova (&, <, >)
 
 # ReportLab za profesionalni PDF izgled
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, HRFlowable
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 
 st.set_page_config(page_title="Makromikro - Prikupi & Povrati", layout="wide", page_icon="📦")
 
@@ -26,6 +27,15 @@ if "baza_naloga" not in st.session_state:
     st.session_state.baza_naloga = []
 
 st.title("📦 MAKROMIKRO GRUPA — Upravljanje Prikupima i Povratima")
+
+# Pomoćna funkcija za čišćenje teksta za ReportLab
+def clean_txt(text):
+    if not text:
+        return "-"
+    # Pretvori sve &, <, > u siguran oblik da ne ruši PDF parser
+    escaped = html.escape(str(text))
+    # Pretvori nove redove u <br/>
+    return escaped.replace('\n', '<br/>')
 
 # FUNKCIJA ZA DOKUMENT IDENTIČAN VAŠEM PDF OBRAZCU
 def generiraj_pdf_makromikro(nalozi_list):
@@ -48,7 +58,7 @@ def generiraj_pdf_makromikro(nalozi_list):
     sec_hdr = ParagraphStyle('SecHdr', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold', textColor=colors.HexColor('#333333'))
 
     for idx, n in enumerate(nalozi_list):
-        # 1. ZAGLAVLJE FIRME (Logo tekst / Podaci)
+        # 1. ZAGLAVLJE FIRME
         logo_text = Paragraph("<b>makromikro</b><br/><font color='#cc0000'><b>GRUPA</b></font>", header_title)
         info_text = Paragraph("<b>Makromikro grupa d.o.o.</b><br/>Vukomerička ulica 6,<br/>10410 Velika Gorica, Hrvatska<br/>OIB: 50467974870", header_sub)
         
@@ -61,17 +71,19 @@ def generiraj_pdf_makromikro(nalozi_list):
         story.append(Spacer(1, 15))
 
         # 2. NASLOV DOKUMENTA
-        naslov_dokumenta = f"ZAHTJEV ZA TRANSPORT — {n['Tip'].upper()} ({n['ID Naloga']})"
+        naslov_dokumenta = f"ZAHTJEV ZA TRANSPORT — {clean_txt(n['Tip']).upper()} ({clean_txt(n['ID Naloga'])})"
         story.append(Paragraph(naslov_dokumenta, doc_title))
 
-        # 3. TABLICA S OSNOVNIM PODACIMA
+        # 3. TABLICA S OSNOVNIM PODACIMA (Čišćenje teksta preko clean_txt)
+        dobavljac_kontakt = f"<b>{clean_txt(n['Dobavljač'])}</b>, {clean_txt(n['Adresa i Kontakt'])}"
+        
         podaci = [
-            [Paragraph("Podnositelj zahtjeva:", lbl_style), Paragraph(n['Komercijalist'], val_style)],
-            [Paragraph("Datum i vrijeme:", lbl_style), Paragraph(n['Datum Prikupa'], val_style)],
-            [Paragraph("Adresa prikupljanja / Dobavljač:", lbl_style), Paragraph(f"<b>{n['Dobavljač']}</b>, {n['Adresa i Kontakt']}", val_style)],
+            [Paragraph("Podnositelj zahtjeva:", lbl_style), Paragraph(clean_txt(n['Komercijalist']), val_style)],
+            [Paragraph("Datum i vrijeme:", lbl_style), Paragraph(clean_txt(n['Datum Prikupa']), val_style)],
+            [Paragraph("Adresa prikupljanja / Dobavljač:", lbl_style), Paragraph(dobavljac_kontakt, val_style)],
             [Paragraph("Mjesto otpreme / Odredište:", lbl_style), Paragraph("Skladište Velika Gorica", val_style)],
-            [Paragraph("Vrsta robe:", lbl_style), Paragraph(n['Opis robe'].replace('\n', '<br/>'), val_style)],
-            [Paragraph("Napomena:", lbl_style), Paragraph(n['Napomena'] or "-", val_style)],
+            [Paragraph("Vrsta robe:", lbl_style), Paragraph(clean_txt(n['Opis robe']), val_style)],
+            [Paragraph("Napomena:", lbl_style), Paragraph(clean_txt(n['Napomena']), val_style)],
         ]
 
         t_podaci = Table(podaci, colWidths=[160, 365])
@@ -119,7 +131,6 @@ def generiraj_pdf_makromikro(nalozi_list):
         ]))
         story.append(t_skladiste)
 
-        # Prelazak na novu stranicu ako ima više naloga
         if idx < len(nalozi_list) - 1:
             story.append(PageBreak())
 
