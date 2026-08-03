@@ -24,7 +24,7 @@ def init_supabase() -> Client:
 
 try:
     supabase = init_supabase()
-except Exception as e:
+except Exception:
     supabase = None
 
 # --- SPREMANJE I UČITAVANJE IZ TRAJNE BAZE ---
@@ -33,7 +33,6 @@ def ucitaj_naloge():
         try:
             response = supabase.table("nalozi").select("*").order("created_at", desc=False).execute()
             raw_data = response.data
-            # Prilagodba imena stupaca za aplikaciju
             nalozi = []
             for r in raw_data:
                 nalozi.append({
@@ -55,6 +54,30 @@ def ucitaj_naloge():
             return []
     return []
 
+def ucitaj_dobavljace():
+    if supabase:
+        try:
+            response = supabase.table("dobavljaci").select("*").order("naziv", desc=False).execute()
+            data = response.data
+            # Vraća rječnik {naziv: {kontakt, adresa_prikupa, napomena}}
+            return {d["naziv"]: d for d in data}
+        except Exception:
+            return {}
+    return {}
+
+def spremi_ili_azuriraj_dobavljaca(naziv, kontakt, adresa, napomena):
+    if supabase and naziv and naziv != "Novi dobavljač...":
+        try:
+            podaci = {
+                "naziv": naziv.strip(),
+                "kontakt": kontakt.strip() if kontakt else "-",
+                "adresa_prikupa": adresa.strip() if adresa else "-",
+                "napomena": napomena.strip() if napomena else "-"
+            }
+            supabase.table("dobavljaci").upsert(podaci, on_conflict="naziv").execute()
+        except Exception as e:
+            st.error(f"Greška pri spremanju dobavljača: {e}")
+
 def spremi_novi_nalog(n):
     if supabase:
         try:
@@ -73,6 +96,8 @@ def spremi_novi_nalog(n):
                 "vrijeme_obrade": n["Vrijeme Obrade"]
             }
             supabase.table("nalozi").insert(data).execute()
+            # Spremi/ažuriraj i u bazi dobavljača za buduće automatsko popunjavanje
+            spremi_ili_azuriraj_dobavljaca(n["Dobavljač"], n["Kontakt"], n["Adresa Prikupa"], n["Napomena"])
         except Exception as e:
             st.error(f"Greška pri spremanju u bazu: {e}")
 
@@ -89,6 +114,9 @@ def azuriraj_status_naloga(id_naloga, novi_status, vrijeme_obrade="-"):
 # Inicijalizacija baze u session_state
 if "baza_naloga" not in st.session_state:
     st.session_state.baza_naloga = ucitaj_naloge()
+
+if "baza_dobavljaca" not in st.session_state:
+    st.session_state.baza_dobavljaca = ucitaj_dobavljace()
 
 st.markdown("""
     <style>
@@ -231,6 +259,27 @@ with tab1:
         st.warning("⚠️ Logo nije pronađen (`logo.png`).")
 
     st.subheader("Unos novog naloga (Komercijalist)")
+
+    # Učitavanje spremnih dobavljača iz baze
+    dobavljaci_dict = st.session_state.baza_dobavljaca
+    lista_dobavljaca = ["Novi dobavljač..."] + sorted(list(dobavljaci_dict.keys()))
+
+    c_dob1, c_dob2 = st.columns([1, 1])
+    odabrani_dobavljac_opcija = c_dob1.selectbox("Odaberi postojećeg dobavljača (ili unesi novog):", lista_dobavljaca)
+
+    if odabrani_dobavljac_opcija != "Novi dobavljač...":
+        podaci_dob = dobavljaci_dict.get(odabrani_dobavljac_opcija, {})
+        zadati_naziv = odabrani_dobavljac_opcija
+        zadati_kontakt = podaci_dob.get("kontakt", "")
+        zadana_adresa = podaci_dob.get("adresa_prikupa", "")
+        zadana_napomena = podaci_dob.get("napomena", "")
+        st.info(f"💡 Automatski povučeni podaci za dobavljača **{odabrani_dobavljac_opcija}**")
+    else:
+        zadati_naziv = ""
+        zadati_kontakt = ""
+        zadana_adresa = ""
+        zadana_napomena = ""
+
     with st.form("forma_unos", clear_on_submit=True):
         c1, c2, c3 = st.columns(3)
         tip = c1.selectbox("Tip dokumenta", ["Prikup", "Povrat"])
@@ -238,15 +287,15 @@ with tab1:
         datum = c3.date_input("Datum prikupa", datetime.now())
 
         c4, c5 = st.columns(2)
-        dobavljac = c4.text_input("Dobavljač / Tvrtka")
-        kontakt = c5.text_input("Kontakt telefon / Osoba")
+        dobavljac = c4.text_input("Dobavljač / Tvrtka", value=zadati_naziv)
+        kontakt = c5.text_input("Kontakt telefon / Osoba", value=zadati_kontakt if zadati_kontakt != "-" else "")
 
         c6, c7 = st.columns(2)
-        adresa_prikupa = c6.text_input("Adresa prikupljanja", placeholder="npr. Tina Ujevića 28, Dugo Selo")
+        adresa_prikupa = c6.text_input("Adresa prikupljanja", value=zadana_adresa if zadana_adresa != "-" else "", placeholder="npr. Tina Ujevića 28, Dugo Selo")
         adresa_dostave = c7.text_input("Adresa dostave", value="Makromikro grupa d.o.o., Vukomerička ulica 6, 10410 Velika Gorica")
 
         opis = st.text_area("Vrsta robe / Opis i količina")
-        napomena = st.text_input("Napomena za vozača")
+        napomena = st.text_input("Napomena za vozača", value=zadana_napomena if zadana_napomena != "-" else "")
 
         submit = st.form_submit_button("Spremi Nalog", type="primary")
 
@@ -274,7 +323,8 @@ with tab1:
                 }
                 spremi_novi_nalog(novi_nalog)
                 st.session_state.baza_naloga = ucitaj_naloge()
-                st.success(f"Nalog {id_naloga} uspuješno i trajno spremljen!")
+                st.session_state.baza_dobavljaca = ucitaj_dobavljace()
+                st.success(f"Nalog {id_naloga} uspješno spremljen! Podaci o dobavljaču zapamćeni za ubuduće.")
 
 with tab2:
     st.subheader("Filtriranje i Upravljanje Nalozima")
@@ -282,6 +332,7 @@ with tab2:
     # Osvježi podatke iz baze na gumb
     if st.button("🔄 Osvježi podatke iz baze"):
         st.session_state.baza_naloga = ucitaj_naloge()
+        st.session_state.baza_dobavljaca = ucitaj_dobavljace()
         st.rerun()
 
     if not st.session_state.baza_naloga:
