@@ -12,7 +12,7 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
 
-st.set_page_config(page_title="Makromikro - Prikupi & Povrati", layout="wide", page_icon="📦")
+st.set_page_config(page_title="Makromikro - AI Operations Hub", layout="wide", page_icon="📦")
 
 # === PODACI ZA KONEKCIJU NA SUPABASE BAZU ===
 SUPABASE_URL = "https://mxirprzgxtiwyhrmkyxv.supabase.co".strip()
@@ -143,45 +143,45 @@ if not st.session_state.is_logged_in and "role" in query_params:
     st.session_state.is_logged_in = True
     st.session_state.user_role = query_params["role"]
 
-# --- MODERNI CSS STILOVI ---
+# --- MODERNI AI / SAAS CSS STILOVI ---
 st.markdown("""
     <style>
-    /* Globalno pročišćenje pozadine */
-    .block-container { padding-top: 2rem; padding-bottom: 2rem; }
+    /* Glavni kontejner i font */
+    .block-container { padding-top: 2rem; padding-bottom: 3rem; }
     
-    /* Moderne oznake statusa (Badges) */
-    .badge-cekanje { background-color: #fef3c7; color: #92400e; padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 0.8rem; }
-    .badge-isprintano { background-color: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 0.8rem; }
-    .badge-prikupljeno { background-color: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 0.8rem; }
-    .badge-storno { background-color: #fee2e2; color: #991b1b; padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 0.8rem; text-decoration: line-through; }
-    
-    /* Kartica za pojedini nalog */
-    .nalog-card {
-        background-color: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-left: 5px solid #0284c7;
-        padding: 16px;
-        border-radius: 8px;
-        margin-bottom: 10px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    /* Moderne badge oznake statusa */
+    .ai-badge-cekanje { background: rgba(245, 158, 11, 0.1); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.2); padding: 4px 10px; border-radius: 20px; font-weight: 600; font-size: 0.75rem; }
+    .ai-badge-isprintano { background: rgba(14, 165, 233, 0.1); color: #0284c7; border: 1px solid rgba(14, 165, 233, 0.2); padding: 4px 10px; border-radius: 20px; font-weight: 600; font-size: 0.75rem; }
+    .ai-badge-prikupljeno { background: rgba(34, 197, 94, 0.1); color: #16a34a; border: 1px solid rgba(34, 197, 94, 0.2); padding: 4px 10px; border-radius: 20px; font-weight: 600; font-size: 0.75rem; }
+    .ai-badge-storno { background: rgba(239, 68, 68, 0.1); color: #dc2626; border: 1px solid rgba(239, 68, 68, 0.2); padding: 4px 10px; border-radius: 20px; font-weight: 600; font-size: 0.75rem; text-decoration: line-through; }
+
+    /* Elegantna zaglavlja i status traka */
+    .ai-header-box {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+        padding: 16px 24px;
+        border-radius: 12px;
+        color: white;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
     }
     </style>
 """, unsafe_allow_html=True)
 
-# Naslov s vizualnim naglaskom
-st.markdown("## 📦 Makromikro Grupa")
-st.caption("Sustav za upravljanje transportnim nalozima, prikupima i povratima")
-
 # --- SUSTAV ZA PRIJAVU ---
 if not st.session_state.is_logged_in:
-    col_l1, col_l2, col_l3 = st.columns([1, 1.5, 1])
-    with col_l2:
-        st.markdown("### 🔐 Prijava u sustav")
+    c_l1, c_l2, c_l3 = st.columns([1, 1.2, 1])
+    with c_l2:
+        st.markdown("<br><br>", unsafe_allow_html=True)
         with st.container(border=True):
+            st.markdown("### ✨ Makromikro AI Hub")
+            st.caption("Prijavite se za pristup sustavu transportnih naloga")
             unesena_lozinka = st.text_input("Pristupna lozinka:", type="password")
             zapamti_me = st.checkbox("Zapamti me na ovom uređaju")
             
-            if st.button("Prijavi se", type="primary", use_container_width=True):
+            if st.button("Pokreni aplikaciju", type="primary", use_container_width=True):
                  odabrana_uloga = None
                  if unesena_lozinka == "admin123":
                      odabrana_uloga = "admin"
@@ -198,16 +198,30 @@ if not st.session_state.is_logged_in:
                      st.error("Pogrešna lozinka!")
     st.stop()
 
-# --- GLAVNI DIO APLIKACIJE ---
-c_top1, c_top2 = st.columns([4, 1])
-c_top1.success(id="user_status", body=f"Prijavljeni ste kao: **{st.session_state.user_role.upper()}**")
-if c_top2.button("🔒 Odjava", use_container_width=True):
+# --- GLAVNI DIO APLIKACIJE (AI SaaS Header) ---
+role_display = st.session_state.user_role.upper()
+st.markdown(f"""
+    <div class="ai-header-box">
+        <div>
+            <h2 style="margin:0; font-size: 1.4rem; font-weight: 700; color: #ffffff;">⚡ Makromikro Operations Hub</h2>
+            <p style="margin:0; font-size: 0.85rem; color: #94a3b8;">Inteligentno upravljanje prikupima, povratima i WMS logistikom</p>
+        </div>
+        <div style="background: rgba(255,255,255,0.1); padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; color: #38bdf8;">
+            Uloga: {role_display}
+        </div>
+    </div>
+""", unsafe_allow_html=True)
+
+# Gumb za odjavu izvučen izvan HTML-a radi ispravnog Streamlit ponašanja
+if st.button("🔒 Odjava iz sustava", use_container_width=False):
     st.session_state.is_logged_in = False
     st.session_state.user_role = None
     st.session_state.ponovi_prikup_data = None
     if "role" in st.query_params:
         del st.query_params["role"]
     st.rerun()
+
+st.markdown("<br>", unsafe_allow_html=True)
 
 def nadji_logo():
     moguce_opcije = ["logo.png", "logo.jpg", "logo.jpeg", "logo.PNG", "LOGO.PNG", "LOGO.JPG"]
@@ -327,7 +341,7 @@ def generiraj_pdf_makromikro(nalozi_list):
     return buffer
 
 
-tab1, tab2 = st.tabs(["➕ Unos Novog Naloga", "📋 Pregled, Print & Upravljanje"])
+tab1, tab2 = st.tabs(["✨ Unos Novog Naloga", "📊 Pregled & Upravljanje"])
 
 with tab1:
     st.subheader("Unos novog naloga")
@@ -417,7 +431,7 @@ with tab1:
 
 with tab2:
     col_h1, col_h2 = st.columns([3, 1])
-    col_h1.subheader("📋 Pregled svih unesenih naloga")
+    col_h1.subheader("📋 Upravljanje transportnim nalozima")
     if col_h2.button("🔄 Osvježi podatke", use_container_width=True):
         st.session_state.baza_naloga = ucitaj_naloge()
         st.session_state.baza_dobavljaca = ucitaj_dobavljace()
@@ -466,7 +480,7 @@ with tab2:
         aktivni_u_filtru = [x for x in filtrirani if x["Status"] != "Storno"]
         storno_u_filtru = [x for x in filtrirani if x["Status"] == "Storno"]
         
-        # Prikaz modernih metrika umjesto običnog teksta
+        # Prikaz modernih metrika
         m1, m2, m3 = st.columns(3)
         m1.metric("Ukupno u prikazu", len(filtrirani))
         m2.metric("Aktivni nalozi", len(aktivni_u_filtru))
@@ -526,7 +540,7 @@ with tab2:
 
         statusi_opcije = ["Na čekanju", "Isprintano", "Prikupljeno", "Storno"]
 
-        # Prikaz svake stavke unutar lijepe vizualne kartice (`st.container(border=True)`)
+        # Prikaz svake stavke unutar vizualne kartice
         for i, nalog in enumerate(filtrirani):
             with st.container(border=True):
                 c1, c2, c3, c4, c5 = st.columns([1.2, 1.8, 2.5, 1.5, 2.2])
@@ -541,9 +555,9 @@ with tab2:
                 c3.markdown(f"📍 _{nalog['Adresa Prikupa']}_")
                 c3.caption(f"📦 {nalog['Opis robe']}")
                 
-                st_cls = "badge-cekanje" if nalog['Status'] == "Na čekanju" else (
-                    "badge-isprintano" if nalog['Status'] == "Isprintano" else (
-                        "badge-prikupljeno" if nalog['Status'] == "Prikupljeno" else "badge-storno"
+                st_cls = "ai-badge-cekanje" if nalog['Status'] == "Na čekanju" else (
+                    "ai-badge-isprintano" if nalog['Status'] == "Isprintano" else (
+                        "ai-badge-prikupljeno" if nalog['Status'] == "Prikupljeno" else "ai-badge-storno"
                     )
                 )
                 c4.markdown(f"<span class='{st_cls}'>{nalog['Status']}</span>", unsafe_allow_html=True)
