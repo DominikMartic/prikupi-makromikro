@@ -15,7 +15,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 st.set_page_config(page_title="Makromikro - Prikupi & Povrati", layout="wide", page_icon="📦")
 
 # === PODACI ZA KONEKCIJU NA SUPABASE BAZU ===
-SUPABASE_URL = "https://mxirprzgxtiwyhrmkyxv.supabase.co/rest/v1/"
+SUPABASE_URL = "https://mxirprzgxtiwyhrmkyxv.supabase.co"
 SUPABASE_KEY = "sb_publishable_2S7TjxGUgklILren3fJl0g_Gosq01mB"
 
 @st.cache_resource
