@@ -2,13 +2,14 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import io
-import html  # Za sigurno pretvaranje specijalnih znakova (&, <, >)
+import html
+import os
 
 # ReportLab za profesionalni PDF izgled
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
 
 st.set_page_config(page_title="Makromikro - Prikupi & Povrati", layout="wide", page_icon="📦")
 
@@ -28,13 +29,11 @@ if "baza_naloga" not in st.session_state:
 
 st.title("📦 MAKROMIKRO GRUPA — Upravljanje Prikupima i Povratima")
 
-# Pomoćna funkcija za čišćenje teksta za ReportLab
+# Pomoćna funkcija za siguran unos teksta u PDF
 def clean_txt(text):
     if not text:
         return "-"
-    # Pretvori sve &, <, > u siguran oblik da ne ruši PDF parser
     escaped = html.escape(str(text))
-    # Pretvori nove redove u <br/>
     return escaped.replace('\n', '<br/>')
 
 # FUNKCIJA ZA DOKUMENT IDENTIČAN VAŠEM PDF OBRAZCU
@@ -50,21 +49,26 @@ def generiraj_pdf_makromikro(nalozi_list):
 
     # Stilovi teksta
     header_title = ParagraphStyle('HeaderTitle', parent=styles['Normal'], fontSize=16, fontName='Helvetica-Bold', textColor=colors.HexColor('#003366'))
-    header_sub = ParagraphStyle('HeaderSub', parent=styles['Normal'], fontSize=8, fontName='Helvetica', textColor=colors.HexColor('#333333'), leading=10)
-    doc_title = ParagraphStyle('DocTitle', parent=styles['Heading1'], fontSize=15, fontName='Helvetica-Bold', alignment=1, spaceAfter=15)
+    header_sub = ParagraphStyle('HeaderSub', parent=styles['Normal'], fontSize=8, fontName='Helvetica', textColor=colors.HexColor('#333333'), leading=11)
+    doc_title = ParagraphStyle('DocTitle', parent=styles['Heading1'], fontSize=15, fontName='Helvetica-Bold', alignment=1, spaceAfter=15, textColor=colors.HexColor('#003366'))
     
     lbl_style = ParagraphStyle('Lbl', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold', leading=12)
     val_style = ParagraphStyle('Val', parent=styles['Normal'], fontSize=9, fontName='Helvetica', leading=12)
-    sec_hdr = ParagraphStyle('SecHdr', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold', textColor=colors.HexColor('#333333'))
+    sec_hdr = ParagraphStyle('SecHdr', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold', textColor=colors.HexColor('#003366'))
 
     for idx, n in enumerate(nalozi_list):
-        # 1. ZAGLAVLJE FIRME
-        logo_text = Paragraph("<b>makromikro</b><br/><font color='#cc0000'><b>GRUPA</b></font>", header_title)
+        # 1. ZAGLAVLJE FIRME (Slika logo ako postoji, inače stilizirani tekst)
+        if os.path.exists("logo.png"):
+            logo_element = Image("logo.png", width=160, height=50)
+            logo_element.hAlign = 'LEFT'
+        else:
+            logo_element = Paragraph("<b>makromikro</b><br/><font color='#cc0000'><b>GRUPA</b></font>", header_title)
+
         info_text = Paragraph("<b>Makromikro grupa d.o.o.</b><br/>Vukomerička ulica 6,<br/>10410 Velika Gorica, Hrvatska<br/>OIB: 50467974870", header_sub)
         
-        header_table = Table([[logo_text, info_text]], colWidths=[200, 325])
+        header_table = Table([[logo_element, info_text]], colWidths=[200, 325])
         header_table.setStyle(TableStyle([
-            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
             ('ALIGN', (1,0), (1,0), 'RIGHT')
         ]))
         story.append(header_table)
@@ -74,27 +78,26 @@ def generiraj_pdf_makromikro(nalozi_list):
         naslov_dokumenta = f"ZAHTJEV ZA TRANSPORT — {clean_txt(n['Tip']).upper()} ({clean_txt(n['ID Naloga'])})"
         story.append(Paragraph(naslov_dokumenta, doc_title))
 
-        # 3. TABLICA S OSNOVNIM PODACIMA (Čišćenje teksta preko clean_txt)
-        dobavljac_kontakt = f"<b>{clean_txt(n['Dobavljač'])}</b>, {clean_txt(n['Adresa i Kontakt'])}"
-        
+        # 3. TABLICA S OSNOVNIM PODACIMA
         podaci = [
             [Paragraph("Podnositelj zahtjeva:", lbl_style), Paragraph(clean_txt(n['Komercijalist']), val_style)],
             [Paragraph("Datum i vrijeme:", lbl_style), Paragraph(clean_txt(n['Datum Prikupa']), val_style)],
-            [Paragraph("Adresa prikupljanja / Dobavljač:", lbl_style), Paragraph(dobavljac_kontakt, val_style)],
-            [Paragraph("Mjesto otpreme / Odredište:", lbl_style), Paragraph("Skladište Velika Gorica", val_style)],
-            [Paragraph("Vrsta robe:", lbl_style), Paragraph(clean_txt(n['Opis robe']), val_style)],
-            [Paragraph("Napomena:", lbl_style), Paragraph(clean_txt(n['Napomena']), val_style)],
+            [Paragraph("Dobavljač / Kontakt:", lbl_style), Paragraph(f"<b>{clean_txt(n['Dobavljač'])}</b> ({clean_txt(n['Kontakt'])})", val_style)],
+            [Paragraph("Adresa prikupljanja:", lbl_style), Paragraph(clean_txt(n['Adresa Prikupa']), val_style)],
+            [Paragraph("Adresa dostave (Mjesto otpreme):", lbl_style), Paragraph(clean_txt(n['Adresa Dostave']), val_style)],
+            [Paragraph("Vrsta robe / Opis:", lbl_style), Paragraph(clean_txt(n['Opis robe']), val_style)],
+            [Paragraph("Napomena za vozača:", lbl_style), Paragraph(clean_txt(n['Napomena']), val_style)],
         ]
 
         t_podaci = Table(podaci, colWidths=[160, 365])
         t_podaci.setStyle(TableStyle([
             ('VALIGN', (0,0), (-1,-1), 'TOP'),
             ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cccccc')),
-            ('BACKGROUND', (0,0), (0,-1), colors.HexColor('#f9f9f9')),
+            ('BACKGROUND', (0,0), (0,-1), colors.HexColor('#f4f6f8')),
             ('PADDING', (0,0), (-1,-1), 6),
         ]))
         story.append(t_podaci)
-        story.append(Spacer(1, 20))
+        story.append(Spacer(1, 15))
 
         # 4. SEKCIJA VOZAČ
         story.append(Paragraph("- ispunjava vozač", sec_hdr))
@@ -107,12 +110,12 @@ def generiraj_pdf_makromikro(nalozi_list):
         t_vozac = Table(vozac_data, colWidths=[240, 140, 145])
         t_vozac.setStyle(TableStyle([
             ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#aaaaaa')),
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#f2f2f2')),
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#e9ecef')),
             ('PADDING', (0,0), (-1,-1), 5),
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ]))
         story.append(t_vozac)
-        story.append(Spacer(1, 20))
+        story.append(Spacer(1, 15))
 
         # 5. SEKCIJA SKLADIŠTAR
         story.append(Paragraph("- ispunjava skladištar na prijemu robe u skladištu", sec_hdr))
@@ -125,7 +128,7 @@ def generiraj_pdf_makromikro(nalozi_list):
         t_skladiste = Table(skladiste_data, colWidths=[240, 140, 145])
         t_skladiste.setStyle(TableStyle([
             ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#aaaaaa')),
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#f2f2f2')),
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#e9ecef')),
             ('PADDING', (0,0), (-1,-1), 5),
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ]))
@@ -151,17 +154,21 @@ with tab1:
         datum = c3.date_input("Datum prikupa", datetime.now())
 
         c4, c5 = st.columns(2)
-        dobavljac = c4.text_input("Dobavljač / Adresa prikupljanja")
-        adresa = c5.text_input("Kontakt telefon / Osoba")
+        dobavljac = c4.text_input("Dobavljač / Tvrtka")
+        kontakt = c5.text_input("Kontakt telefon / Osoba")
 
-        opis = st.text_area("Vrsta robe / Opis i količina (npr. Narudžba 9344 - 1 kom)")
-        napomena = st.text_input("Napomena (npr. Nazvati 30 min prije dolaska)")
+        c6, c7 = st.columns(2)
+        adresa_prikupa = c6.text_input("Adresa prikupljanja", placeholder="npr. Tina Ujevića 28, Dugo Selo")
+        adresa_dostave = c7.text_input("Adresa dostave", value="Makromikro grupa d.o.o., Vukomerička ulica 6, 10410 Velika Gorica")
+
+        opis = st.text_area("Vrsta robe / Opis i količina (npr. Narudžba 9344 - vrećice za usisavač, 1 kom)")
+        napomena = st.text_input("Napomena za vozača (npr. Nazvati 30 min prije dolaska)")
 
         submit = st.form_submit_button("Spremi Nalog", type="primary")
 
         if submit:
-            if not komercijalist or not dobavljac or not opis:
-                st.error("Podnositelj, Dobavljač i Vrsta robe su obavezni!")
+            if not komercijalist or not dobavljac or not adresa_prikupa or not opis:
+                st.error("Podnositelj, Dobavljač, Adresa prikupljanja i Vrsta robe su obavezni!")
             else:
                 broj = len(st.session_state.baza_naloga) + 1
                 prefiks = "PR" if tip == "Prikup" else "POV"
@@ -173,7 +180,9 @@ with tab1:
                     "Komercijalist": komercijalist,
                     "Datum Prikupa": datum.strftime("%Y-%m-%d"),
                     "Dobavljač": dobavljac,
-                    "Adresa i Kontakt": adresa,
+                    "Kontakt": kontakt or "-",
+                    "Adresa Prikupa": adresa_prikupa,
+                    "Adresa Dostave": adresa_dostave,
                     "Opis robe": opis,
                     "Napomena": napomena,
                     "Status": "Na čekanju",
@@ -234,7 +243,7 @@ with tab2:
                 c1, c2, c3, c4, c5 = st.columns([1.5, 2, 3, 1.5, 2])
                 c1.write(f"**{nalog['ID Naloga']}** ({nalog['Tip']})")
                 c2.write(f"👤 {nalog['Komercijalist']}\n📅 {nalog['Datum Prikupa']}")
-                c3.write(f"🏢 **{nalog['Dobavljač']}**\n📦 {nalog['Opis robe']}")
+                c3.write(f"🏢 **{nalog['Dobavljač']}**\n📍 *Prikup:* {nalog['Adresa Prikupa']}\n📦 {nalog['Opis robe']}")
                 
                 st_cls = "status-cekanje" if nalog['Status'] == "Na čekanju" else ("status-isprintano" if nalog['Status'] == "Isprintano" else "status-prikupljeno")
                 c4.markdown(f"<span class='{st_cls}'>{nalog['Status']}</span>", unsafe_allow_html=True)
