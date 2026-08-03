@@ -143,122 +143,65 @@ if not st.session_state.is_logged_in and "role" in query_params:
     st.session_state.is_logged_in = True
     st.session_state.user_role = query_params["role"]
 
-# --- MODERNI UI & CSS DIZAJN ---
+# --- MODERNI CSS STILOVI ---
 st.markdown("""
     <style>
-    /* Glavna pozadina i fontovi */
-    .main { background-color: #f4f6f9; }
-    
-    /* Kartice s blagom sjenom i zaobljenim rubovima */
-    div.stContainer {
-        background-color: #ffffff;
-        border: 1px solid #e2e8f0;
-        padding: 16px;
-        border-radius: 12px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-        margin-bottom: 12px;
-    }
-    
-    /* Gumbi */
-    .stButton>button { 
-        border-radius: 8px; 
-        font-weight: 600; 
-        transition: all 0.2s ease-in-out;
-    }
+    /* Globalno pročišćenje pozadine */
+    .block-container { padding-top: 2rem; padding-bottom: 2rem; }
     
     /* Moderne oznake statusa (Badges) */
-    .status-cekanje { 
-        background-color: #fef3c7; 
-        color: #92400e; 
-        padding: 6px 12px; 
-        border-radius: 20px; 
-        font-weight: 600; 
-        font-size: 0.85rem;
-        display: inline-block;
-    }
-    .status-isprintano { 
-        background-color: #e0f2fe; 
-        color: #0369a1; 
-        padding: 6px 12px; 
-        border-radius: 20px; 
-        font-weight: 600; 
-        font-size: 0.85rem;
-        display: inline-block;
-    }
-    .status-prikupljeno { 
-        background-color: #dcfce7; 
-        color: #166534; 
-        padding: 6px 12px; 
-        border-radius: 20px; 
-        font-weight: 600; 
-        font-size: 0.85rem;
-        display: inline-block;
-    }
-    .status-storno { 
-        background-color: #fee2e2; 
-        color: #991b1b; 
-        padding: 6px 12px; 
-        border-radius: 20px; 
-        font-weight: 600; 
-        font-size: 0.85rem;
-        text-decoration: line-through;
-        display: inline-block;
-    }
+    .badge-cekanje { background-color: #fef3c7; color: #92400e; padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 0.8rem; }
+    .badge-isprintano { background-color: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 0.8rem; }
+    .badge-prikupljeno { background-color: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 0.8rem; }
+    .badge-storno { background-color: #fee2e2; color: #991b1b; padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 0.8rem; text-decoration: line-through; }
     
-    /* Stil tabova */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-    }
-    .stTabs [data-baseweb="tab"] {
+    /* Kartica za pojedini nalog */
+    .nalog-card {
         background-color: #ffffff;
-        border-radius: 8px 8px 0px 0px;
-        padding: 10px 20px;
-        font-weight: 600;
         border: 1px solid #e2e8f0;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: #ffffff !important;
-        border-bottom: 3px solid #0284c7 !important;
-        color: #0284c7 !important;
+        border-left: 5px solid #0284c7;
+        padding: 16px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📦 MAKROMIKRO GRUPA — Upravljanje Prikupima i Povratima")
+# Naslov s vizualnim naglaskom
+st.markdown("## 📦 Makromikro Grupa")
+st.caption("Sustav za upravljanje transportnim nalozima, prikupima i povratima")
 
 # --- SUSTAV ZA PRIJAVU ---
 if not st.session_state.is_logged_in:
-    st.warning("🔒 Za pristup aplikaciji obavezna je prijava.")
-    
-    col_l1, col_l2, _ = st.columns([1.5, 1.5, 3])
-    with col_l1:
-        unesena_lozinka = st.text_input("Unesite pristupnu lozinku:", type="password")
-        zapamti_me = st.checkbox("Zapamti me na ovom uređaju")
-        
-        if st.button("Prijavi se", type="primary"):
-             odabrana_uloga = None
-             if unesena_lozinka == "admin123":
-                 odabrana_uloga = "admin"
-             elif unesena_lozinka == "komercijalist123":
-                 odabrana_uloga = "komercijalist"
-                 
-             if odabrana_uloga:
-                 st.session_state.is_logged_in = True
-                 st.session_state.user_role = odabrana_uloga
-                 
-                 if zapamti_me:
-                     st.query_params["role"] = odabrana_uloga
+    col_l1, col_l2, col_l3 = st.columns([1, 1.5, 1])
+    with col_l2:
+        st.markdown("### 🔐 Prijava u sustav")
+        with st.container(border=True):
+            unesena_lozinka = st.text_input("Pristupna lozinka:", type="password")
+            zapamti_me = st.checkbox("Zapamti me na ovom uređaju")
+            
+            if st.button("Prijavi se", type="primary", use_container_width=True):
+                 odabrana_uloga = None
+                 if unesena_lozinka == "admin123":
+                     odabrana_uloga = "admin"
+                 elif unesena_lozinka == "komercijalist123":
+                     odabrana_uloga = "komercijalist"
                      
-                 st.success(f"Uspješna prijava kao {odabrana_uloga.upper()}!")
-                 st.rerun()
-             else:
-                 st.error("Pogrešna lozinka!")
+                 if odabrana_uloga:
+                     st.session_state.is_logged_in = True
+                     st.session_state.user_role = odabrana_uloga
+                     if zapamti_me:
+                         st.query_params["role"] = odabrana_uloga
+                     st.rerun()
+                 else:
+                     st.error("Pogrešna lozinka!")
     st.stop()
 
 # --- GLAVNI DIO APLIKACIJE ---
 c_top1, c_top2 = st.columns([4, 1])
-c_top1.info(f"Prijavljeni korisnik: **{st.session_state.user_role.upper()}**")
-if c_top2.button("🔒 Odjava"):
+c_top1.success(id="user_status", body=f"Prijavljeni ste kao: **{st.session_state.user_role.upper()}**")
+if c_top2.button("🔒 Odjava", use_container_width=True):
     st.session_state.is_logged_in = False
     st.session_state.user_role = None
     st.session_state.ponovi_prikup_data = None
@@ -416,55 +359,56 @@ with tab1:
         zadana_adresa = pp_data.get("Adresa Prikupa", "") if pp_data else ""
         zadana_napomena = pp_data.get("Napomena", "") if pp_data else ""
 
-    with st.form("forma_unos", clear_on_submit=True):
-        c1, c2, c3 = st.columns(3)
-        
-        default_tip_idx = 1 if pp_data and pp_data.get("Tip") == "Povrat" else 0
-        tip = c1.selectbox("Tip dokumenta", ["Prikup", "Povrat"], index=default_tip_idx)
-        
-        komercijalist = c2.text_input("Podnositelj zahtjeva (Komercijalist)", value=pp_data.get("Komercijalist", "") if pp_data else "")
-        datum = c3.date_input("Datum prikupa", datetime.now())
+    with st.container(border=True):
+        with st.form("forma_unos", clear_on_submit=True):
+            c1, c2, c3 = st.columns(3)
+            
+            default_tip_idx = 1 if pp_data and pp_data.get("Tip") == "Povrat" else 0
+            tip = c1.selectbox("Tip dokumenta", ["Prikup", "Povrat"], index=default_tip_idx)
+            
+            komercijalist = c2.text_input("Podnositelj zahtjeva (Komercijalist)", value=pp_data.get("Komercijalist", "") if pp_data else "")
+            datum = c3.date_input("Datum prikupa", datetime.now())
 
-        c4, c5 = st.columns(2)
-        dobavljac = c4.text_input("Dobavljač / Tvrtka", value=zadati_naziv)
-        kontakt = c5.text_input("Kontakt telefon / Osoba", value=zadati_kontakt if zadati_kontakt != "-" else "")
+            c4, c5 = st.columns(2)
+            dobavljac = c4.text_input("Dobavljač / Tvrtka", value=zadati_naziv)
+            kontakt = c5.text_input("Kontakt telefon / Osoba", value=zadati_kontakt if zadati_kontakt != "-" else "")
 
-        c6, c7 = st.columns(2)
-        adresa_prikupa = c6.text_input("Adresa prikupljanja", value=zadana_adresa if zadana_adresa != "-" else "", placeholder="npr. Tina Ujevića 28, Dugo Selo")
-        adresa_dostave = c7.text_input("Adresa dostave", value="Makromikro grupa d.o.o., Vukomerička ulica 6, 10410 Velika Gorica")
+            c6, c7 = st.columns(2)
+            adresa_prikupa = c6.text_input("Adresa prikupljanja", value=zadana_adresa if zadana_adresa != "-" else "", placeholder="npr. Tina Ujevića 28, Dugo Selo")
+            adresa_dostave = c7.text_input("Adresa dostave", value="Makromikro grupa d.o.o., Vukomerička ulica 6, 10410 Velika Gorica")
 
-        opis = st.text_area("Vrsta robe / Opis i količina", value=pp_data.get("Opis robe", "") if pp_data else "")
-        napomena = st.text_input("Napomena za vozača", value=zadana_napomena if zadana_napomena != "-" else "")
+            opis = st.text_area("Vrsta robe / Opis i količina", value=pp_data.get("Opis robe", "") if pp_data else "")
+            napomena = st.text_input("Napomena za vozača", value=zadana_napomena if zadana_napomena != "-" else "")
 
-        submit = st.form_submit_button("Spremi Nalog", type="primary")
+            submit = st.form_submit_button("Spremi Nalog", type="primary", use_container_width=True)
 
-        if submit:
-            if not komercijalist or not dobavljac or not adresa_prikupa or not opis:
-                st.error("Podnositelj, Dobavljač, Adresa prikupljanja i Vrsta robe su obavezni!")
-            else:
-                broj = len(st.session_state.baza_naloga) + 1
-                prefiks = "PR" if tip == "Prikup" else "POV"
-                id_naloga = f"{prefiks}-2026-{broj:03d}"
-                
-                novi_nalog = {
-                    "ID Naloga": id_naloga,
-                    "Tip": tip,
-                    "Komercijalist": komercijalist,
-                    "Datum Prikupa": datum.strftime("%Y-%m-%d"),
-                    "Dobavljač": dobavljac,
-                    "Kontakt": kontakt or "-",
-                    "Adresa Prikupa": adresa_prikupa,
-                    "Adresa Dostave": adresa_dostave,
-                    "Opis robe": opis,
-                    "Napomena": napomena or "-",
-                    "Status": "Na čekanju",
-                    "Vrijeme Obrade": "-"
-                }
-                spremi_novi_nalog(novi_nalog)
-                st.session_state.baza_naloga = ucitaj_naloge()
-                st.session_state.baza_dobavljaca = ucitaj_dobavljace()
-                st.session_state.ponovi_prikup_data = None
-                st.success(f"Nalog {id_naloga} uspješno spremljen! Podaci o dobavljaču zapamćeni za ubuduće.")
+            if submit:
+                if not komercijalist or not dobavljac or not adresa_prikupa or not opis:
+                    st.error("Podnositelj, Dobavljač, Adresa prikupljanja i Vrsta robe su obavezni!")
+                else:
+                    broj = len(st.session_state.baza_naloga) + 1
+                    prefiks = "PR" if tip == "Prikup" else "POV"
+                    id_naloga = f"{prefiks}-2026-{broj:03d}"
+                    
+                    novi_nalog = {
+                        "ID Naloga": id_naloga,
+                        "Tip": tip,
+                        "Komercijalist": komercijalist,
+                        "Datum Prikupa": datum.strftime("%Y-%m-%d"),
+                        "Dobavljač": dobavljac,
+                        "Kontakt": kontakt or "-",
+                        "Adresa Prikupa": adresa_prikupa,
+                        "Adresa Dostave": adresa_dostave,
+                        "Opis robe": opis,
+                        "Napomena": napomena or "-",
+                        "Status": "Na čekanju",
+                        "Vrijeme Obrade": "-"
+                    }
+                    spremi_novi_nalog(novi_nalog)
+                    st.session_state.baza_naloga = ucitaj_naloge()
+                    st.session_state.baza_dobavljaca = ucitaj_dobavljace()
+                    st.session_state.ponovi_prikup_data = None
+                    st.success(f"Nalog {id_naloga} uspješno spremljen! Podaci o dobavljaču zapamćeni za ubuduće.")
 
     if pp_data:
         if st.button("❌ Poništi ponovljeni unos"):
@@ -472,39 +416,40 @@ with tab1:
             st.rerun()
 
 with tab2:
-    st.subheader("📋 Pregled svih unesenih naloga")
-
-    if st.button("🔄 Osvježi podatke iz baze"):
+    col_h1, col_h2 = st.columns([3, 1])
+    col_h1.subheader("📋 Pregled svih unesenih naloga")
+    if col_h2.button("🔄 Osvježi podatke", use_container_width=True):
         st.session_state.baza_naloga = ucitaj_naloge()
         st.session_state.baza_dobavljaca = ucitaj_dobavljace()
         st.rerun()
 
     if not st.session_state.baza_naloga:
-        st.info("Trenutno nema unesenih naloga.")
+        st.info("Trenutno nema unesenih naloga u bazi.")
     else:
-        st.markdown("#### 🔍 Pretraga i Filteri")
-        f_kol1, f_kol2, f_kol3, f_kol4 = st.columns(4)
+        with st.container(border=True):
+            st.markdown("##### 🔍 Pretraga i Filteri")
+            f_kol1, f_kol2, f_kol3, f_kol4 = st.columns(4)
 
-        search_query = f_kol1.text_input("Pretraživanje (pojam):", placeholder="npr. HP, toner, PR-2026...")
+            search_query = f_kol1.text_input("Pojam pretrage:", placeholder="HP, toner, ID...")
 
-        sve_datume = sorted(list(set([x["Datum Prikupa"] for x in st.session_state.baza_naloga])), reverse=True)
-        odabrani_datum = f_kol2.selectbox("Filter po datumu:", ["Svi datumi"] + sve_datume)
+            sve_datume = sorted(list(set([x["Datum Prikupa"] for x in st.session_state.baza_naloga])), reverse=True)
+            odabrani_datum = f_kol2.selectbox("Datum:", ["Svi datumi"] + sve_datume)
 
-        svi_komercijalisti = sorted(list(set([x["Komercijalist"] for x in st.session_state.baza_naloga])))
-        odabrani_komercijalist = f_kol3.selectbox("Filter po komercijalistu:", ["Svi komercijalisti"] + svi_komercijalisti)
+            svi_komercijalisti = sorted(list(set([x["Komercijalist"] for x in st.session_state.baza_naloga])))
+            odabrani_komercijalist = f_kol3.selectbox("Komercijalist:", ["Svi"] + svi_komercijalisti)
 
-        svi_dobavljaci_lista = sorted(list(set([x["Dobavljač"] for x in st.session_state.baza_naloga])))
-        odabrani_dobavljac_filter = f_kol4.selectbox("Filter po dobavljaču:", ["Svi dobavljači"] + svi_dobavljaci_lista)
+            svi_dobavljaci_lista = sorted(list(set([x["Dobavljač"] for x in st.session_state.baza_naloga])))
+            odabrani_dobavljac_filter = f_kol4.selectbox("Dobavljač:", ["Svi"] + svi_dobavljaci_lista)
 
         filtrirani = st.session_state.baza_naloga
 
         if odabrani_datum != "Svi datumi":
             filtrirani = [x for x in filtrirani if x["Datum Prikupa"] == odabrani_datum]
 
-        if odabrani_komercijalist != "Svi komercijalisti":
+        if odabrani_komercijalist != "Svi":
             filtrirani = [x for x in filtrirani if x["Komercijalist"] == odabrani_komercijalist]
 
-        if odabrani_dobavljac_filter != "Svi dobavljači":
+        if odabrani_dobavljac_filter != "Svi":
             filtrirani = [x for x in filtrirani if x["Dobavljač"] == odabrani_dobavljac_filter]
 
         if search_query:
@@ -521,7 +466,11 @@ with tab2:
         aktivni_u_filtru = [x for x in filtrirani if x["Status"] != "Storno"]
         storno_u_filtru = [x for x in filtrirani if x["Status"] == "Storno"]
         
-        st.markdown(f"📊 **Statistika prikaza:** Prikazano naloga: **{len(filtrirani)}** | Aktivnih: **{len(aktivni_u_filtru)}** | Storniranih: **{len(storno_u_filtru)}**")
+        # Prikaz modernih metrika umjesto običnog teksta
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Ukupno u prikazu", len(filtrirani))
+        m2.metric("Aktivni nalozi", len(aktivni_u_filtru))
+        m3.metric("Stornirani", len(storno_u_filtru))
 
         st.divider()
 
@@ -532,13 +481,14 @@ with tab2:
             if za_print:
                 pdf_bytes = generiraj_pdf_makromikro(za_print).getvalue()
                 col_act1.download_button(
-                    label=f"📄 Preuzmi PDF Zbirni Zahtjev ({len(za_print)} aktivnih naloga)",
+                    label=f"📄 Preuzmi PDF Zbirni Zahtjev ({len(za_print)} naloga)",
                     data=pdf_bytes,
                     file_name=f"Zahtjev_za_transport_zbirni_{datetime.now().strftime('%Y-%m-%d')}.pdf",
                     mime="application/pdf",
-                    type="primary"
+                    type="primary",
+                    use_container_width=True
                 )
-                if col_act1.button("✏️ Označi ove naloge kao 'Isprintano'"):
+                if col_act1.button("✏️ Označi ove naloge kao 'Isprintano'", use_container_width=True):
                     for item in za_print:
                         if item["Status"] == "Na čekanju":
                             azuriraj_status_naloga(item["ID Naloga"], "Isprintano")
@@ -547,7 +497,7 @@ with tab2:
             else:
                 col_act1.info("Nema aktivnih naloga spremnih za ispis u ovom filteru.")
 
-            if col_act2.button("✅ Označi SVE prikazane aktivne naloge kao PRIKUPLJENO"):
+            if col_act2.button("✅ Označi SVE prikazane aktivne naloge kao PRIKUPLJENO", use_container_width=True):
                 sada_str = f"{datetime.now().strftime('%d.%m.%Y. %H:%M')} (Admin)"
                 brojac = 0
                 for item in filtrirani:
@@ -558,9 +508,7 @@ with tab2:
                 st.success(f"Status promijenjen u 'Prikupljeno' za {brojac} naloga!")
                 st.rerun()
 
-            st.divider()
-            
-            with st.expander("⚠️ Opasna zona / Čišćenje baze"):
+            with st.expander("⚠️ Napredno / Čišćenje baze (Admin zona)"):
                 c_brisi1, c_brisi2 = st.columns(2)
                 if c_brisi1.button("🗑️ Obriši SVE naloge"):
                     if st.checkbox("Potvrdi brisanje naloga", key="p_nalozi"):
@@ -578,16 +526,24 @@ with tab2:
 
         statusi_opcije = ["Na čekanju", "Isprintano", "Prikupljeno", "Storno"]
 
+        # Prikaz svake stavke unutar lijepe vizualne kartice (`st.container(border=True)`)
         for i, nalog in enumerate(filtrirani):
-            with st.container():
-                c1, c2, c3, c4, c5 = st.columns([1.5, 2, 2.5, 1.5, 2.5])
-                c1.write(f"**{nalog['ID Naloga']}**\n\n`{nalog['Tip']}`")
-                c2.write(f"👤 **{nalog['Komercijalist']}**\n📅 {nalog['Datum Prikupa']}")
-                c3.write(f"🏢 **{nalog['Dobavljač']}**\n📍 {nalog['Adresa Prikupa']}\n📦 _{nalog['Opis robe']}_")
+            with st.container(border=True):
+                c1, c2, c3, c4, c5 = st.columns([1.2, 1.8, 2.5, 1.5, 2.2])
                 
-                st_cls = "status-cekanje" if nalog['Status'] == "Na čekanju" else (
-                    "status-isprintano" if nalog['Status'] == "Isprintano" else (
-                        "status-prikupljeno" if nalog['Status'] == "Prikupljeno" else "status-storno"
+                c1.markdown(f"**{nalog['ID Naloga']}**")
+                c1.caption(f"Tip: {nalog['Tip']}")
+                
+                c2.markdown(f"👤 **{nalog['Komercijalist']}**")
+                c2.caption(f"📅 {nalog['Datum Prikupa']}")
+                
+                c3.markdown(f"🏢 **{nalog['Dobavljač']}**")
+                c3.markdown(f"📍 _{nalog['Adresa Prikupa']}_")
+                c3.caption(f"📦 {nalog['Opis robe']}")
+                
+                st_cls = "badge-cekanje" if nalog['Status'] == "Na čekanju" else (
+                    "badge-isprintano" if nalog['Status'] == "Isprintano" else (
+                        "badge-prikupljeno" if nalog['Status'] == "Prikupljeno" else "badge-storno"
                     )
                 )
                 c4.markdown(f"<span class='{st_cls}'>{nalog['Status']}</span>", unsafe_allow_html=True)
@@ -599,10 +555,11 @@ with tab2:
                         trenutni_index = statusi_opcije.index(nalog['Status']) if nalog['Status'] in statusi_opcije else 0
 
                         novi_status = st.selectbox(
-                            "Status",
+                            "Promijeni status",
                             statusi_opcije,
                             index=trenutni_index,
-                            key=f"status_{nalog['ID Naloga']}_{i}"
+                            key=f"status_{nalog['ID Naloga']}_{i}",
+                            label_visibility="collapsed"
                         )
 
                         if novi_status != nalog['Status']:
@@ -611,7 +568,7 @@ with tab2:
                             st.session_state.baza_naloga = ucitaj_naloge()
                             st.rerun()
                     else:
-                        st.write("🔒 *Samo pregled*")
+                        st.caption("🔒 Samo pregled statusa")
 
                     sub_c1, sub_c2 = st.columns(2)
                     
@@ -621,11 +578,10 @@ with tab2:
                         data=single_pdf_bytes,
                         file_name=f"Nalog_{nalog['ID Naloga']}.pdf",
                         mime="application/pdf",
-                        key=f"pdf_single_{nalog['ID Naloga']}_{i}"
+                        key=f"pdf_single_{nalog['ID Naloga']}_{i}",
+                        use_container_width=True
                     )
 
-                    if sub_c2.button("🔄 Ponovi", key=f"ponovi_{nalog['ID Naloga']}_{i}"):
+                    if sub_c2.button("🔄 Ponovi", key=f"ponovi_{nalog['ID Naloga']}_{i}", use_container_width=True):
                         st.session_state.ponovi_prikup_data = nalog
-                        st.success("Podaci kopirani! Prebacite se na karticu 'Unos Novog Naloga'.")
-
-                st.markdown("<hr style='margin:4px 0; border:0.2px solid #f1f5f9;'>", unsafe_allow_html=True)
+                        st.success("Kopirano! Prebacite se na karticu 'Unos'.")
