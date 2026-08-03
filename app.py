@@ -142,16 +142,13 @@ if "user_role" not in st.session_state:
 if "ponovi_prikup_data" not in st.session_state:
     st.session_state.ponovi_prikup_data = None
 
+# --- ODMAH PROVJERI QUERY PARAMETRE (QR KOD / AUTO-LOGIN) ---
 query_params = st.query_params
 
-# Automatska prijava putem QR linka ili query parametra (preskače lozinku pri skeniranju)
-if not st.session_state.is_logged_in:
-    if "role" in query_params:
-        st.session_state.is_logged_in = True
-        st.session_state.user_role = query_params["role"]
-    elif "search" in query_params:
-        st.session_state.is_logged_in = True
-        st.session_state.user_role = "admin"
+# Ako u linku postoji 'search' (skeniran QR kod) ili 'role', automatski daj pristup admina bez lozinke
+if "search" in query_params or "role" in query_params:
+    st.session_state.is_logged_in = True
+    st.session_state.user_role = query_params.get("role", "admin")
 
 # --- MODERNI AI / SAAS CSS STILOVI ---
 st.markdown("""
@@ -206,7 +203,7 @@ if not st.session_state.is_logged_in:
     st.stop()
 
 # --- GLAVNI DIO APLIKACIJE ---
-role_display = st.session_state.user_role.upper()
+role_display = st.session_state.user_role.upper() if st.session_state.user_role else "ADMIN"
 st.markdown(f"""
     <div class="ai-header-box">
         <div>
