@@ -14,11 +14,13 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 
 st.set_page_config(page_title="Makromikro - Prikupi & Povrati", layout="wide", page_icon="📦")
 
+# === POSTAVKE PRISTUPA ===
+ADMIN_LOZINKA = "admin123"  # <--- OVDJE PROMIJENITE SVOJU ADMIN LOZINKU
+
 # === PODACI ZA KONEKCIJU NA SUPABASE BAZU ===
 SUPABASE_URL = "https://mxirprzgxtiwyhrmkyxv.supabase.co".strip()
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14aXJwcnpneHRpd3locm1reXh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3ODQ4ODAsImV4cCI6MjEwMTM2MDg4MH0.6RSbGJ3T89rUY_tFBnv5QvQspNY_7FakipZWvdiEbpg".strip()
 
-# Inicijalizacija bez st.cache_resource radi sigurnog osvježavanja ključa
 def init_supabase() -> Client:
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -109,12 +111,15 @@ def azuriraj_status_naloga(id_naloga, novi_status, vrijeme_obrade="-"):
         except Exception as e:
             st.error(f"Greška pri ažuriranju: {e}")
 
-# Inicijalizacija baze u session_state
+# Inicijalizacija baze i autentičnosti u session_state
 if "baza_naloga" not in st.session_state:
     st.session_state.baza_naloga = ucitaj_naloge()
 
 if "baza_dobavljaca" not in st.session_state:
     st.session_state.baza_dobavljaca = ucitaj_dobavljace()
+
+if "is_admin" not in st.session_state:
+    st.session_state.is_admin = False
 
 st.markdown("""
     <style>
@@ -142,7 +147,6 @@ def clean_txt(text):
     escaped = html.escape(str(text))
     return escaped.replace('\n', '<br/>')
 
-# FUNKCIJA ZA GENERIRANJE PDF-A (Izostavlja stornirane naloge)
 def generiraj_pdf_makromikro(nalozi_list):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -249,16 +253,10 @@ def generiraj_pdf_makromikro(nalozi_list):
 
 
 # --- SUČELJE APLIKACIJE ---
-tab1, tab2 = st.tabs(["➕ Unos Novog Naloga", "📋 Pregled, Print & Upravljanje"])
+tab1, tab2 = st.tabs(["➕ Unos Novog Naloga", "📋 Pregled, Print & Upravljanje (Zaštićeno)"])
 
 with tab1:
-    postojeci_logo = nadji_logo()
-    if postojeci_logo:
-        st.success(f"🖼️ Logo pronađen: `{postojeci_logo}`")
-    else:
-        st.warning("⚠️ Logo nije pronađen (`logo.png`).")
-
-    st.subheader("Unos novog naloga (Komercijalist)")
+    st.subheader("Unos novog naloga (Otvoreno za sve komercijaliste)")
 
     dobavljaci_dict = st.session_state.baza_dobavljaca
     lista_dobavljaca = ["Novi dobavljač..."] + sorted(list(dobavljaci_dict.keys()))
@@ -326,95 +324,112 @@ with tab1:
                 st.success(f"Nalog {id_naloga} uspješno spremljen! Podaci o dobavljaču zapamćeni za ubuduće.")
 
 with tab2:
-    st.subheader("Filtriranje i Upravljanje Nalozima")
-    
-    if st.button("🔄 Osvježi podatke iz baze"):
-        st.session_state.baza_naloga = ucitaj_naloge()
-        st.session_state.baza_dobavljaca = ucitaj_dobavljace()
-        st.rerun()
-
-    if not st.session_state.baza_naloga:
-        st.info("Trenutno nema unesenih naloga.")
-    else:
-        sve_datume = sorted(list(set([x["Datum Prikupa"] for x in st.session_state.baza_naloga])), reverse=True)
-        col_f1, _ = st.columns([1, 2])
-        odabrani_datum = col_f1.selectbox("Filter po datumu prikupa:", ["Svi datumi"] + sve_datume)
-
-        filtrirani = st.session_state.baza_naloga if odabrani_datum == "Svi datumi" else [x for x in st.session_state.baza_naloga if x["Datum Prikupa"] == odabrani_datum]
-
-        # --- PRIKAZ BROJAČA PRIKUPA ---
-        aktivni_u_filtru = [x for x in filtrirani if x["Status"] != "Storno"]
-        storno_u_filtru = [x for x in filtrirani if x["Status"] == "Storno"]
+    # --- PROVJERA PRIJAVE ---
+    if not st.session_state.is_admin:
+        st.subheader("🔒 Prijava za Voditelja / Skladište")
+        st.write("Unesite lozinku kako biste pristupili upravljanju, storniranju i ispisu PDF naloga.")
         
-        st.markdown(f"📊 **Statistika za odabrani period:** Ukupno naloga: **{len(filtrirani)}** | Aktivnih za izvršenje: **{len(aktivni_u_filtru)}** | Storniranih: **{len(storno_u_filtru)}**")
-
-        st.divider()
-        col_act1, col_act2 = st.columns(2)
-
-        za_print = [x for x in filtrirani if x["Status"] in ["Na čekanju", "Isprintano"]]
-
-        if za_print:
-            pdf_bytes = generiraj_pdf_makromikro(za_print).getvalue()
-            col_act1.download_button(
-                label=f"📄 Preuzmi PDF Zahtjev za Transport ({len(za_print)} aktivnih naloga)",
-                data=pdf_bytes,
-                file_name=f"Zahtjev_za_transport_{datetime.now().strftime('%Y-%m-%d')}.pdf",
-                mime="application/pdf",
-                type="primary"
-            )
-            if col_act1.button("✏️ Označi ove naloge kao 'Isprintano'"):
-                for item in za_print:
-                    if item["Status"] == "Na čekanju":
-                        azuriraj_status_naloga(item["ID Naloga"], "Isprintano")
-                st.session_state.baza_naloga = ucitaj_naloge()
+        lozinka_input = st.text_input("Administrator Lozinka", type="password")
+        if st.button("Prijavi se"):
+            if lozinka_input == ADMIN_LOZINKA:
+                st.session_state.is_admin = True
+                st.success("Uspješna prijava!")
                 st.rerun()
-        else:
-            col_act1.info("Nema aktivnih naloga spremnih za ispis.")
-
-        if col_act2.button("✅ Označi SVE prikazane aktivne naloge kao PRIKUPLJENO"):
-            sada_str = datetime.now().strftime("%d.%m.%Y. %H:%M")
-            brojac = 0
-            for item in filtrirani:
-                if item["Status"] in ["Na čekanju", "Isprintano"]:
-                    azuriraj_status_naloga(item["ID Naloga"], "Prikupljeno", sada_str)
-                    brojac += 1
-            st.session_state.baza_naloga = ucitaj_naloge()
-            st.success(f"Status promijenjen u 'Prikupljeno' za {brojac} naloga!")
+            else:
+                st.error("Pogrešna lozinka!")
+    else:
+        # AKO JE PRIJAVLJEN KAO ADMIN:
+        c_head1, c_head2 = st.columns([3, 1])
+        c_head1.subheader("📋 Pregled, Print & Upravljanje Nalozima")
+        if c_head2.button("🔒 Odjavi se"):
+            st.session_state.is_admin = False
             st.rerun()
 
-        st.divider()
-        st.subheader("Pojedinačne postavke naloga")
+        if st.button("🔄 Osvježi podatke iz baze"):
+            st.session_state.baza_naloga = ucitaj_naloge()
+            st.session_state.baza_dobavljaca = ucitaj_dobavljace()
+            st.rerun()
 
-        statusi_opcije = ["Na čekanju", "Isprintano", "Prikupljeno", "Storno"]
+        if not st.session_state.baza_naloga:
+            st.info("Trenutno nema unesenih naloga.")
+        else:
+            sve_datume = sorted(list(set([x["Datum Prikupa"] for x in st.session_state.baza_naloga])), reverse=True)
+            col_f1, _ = st.columns([1, 2])
+            odabrani_datum = col_f1.selectbox("Filter po datumu prikupa:", ["Svi datumi"] + sve_datume)
 
-        for i, nalog in enumerate(filtrirani):
-            with st.container():
-                c1, c2, c3, c4, c5 = st.columns([1.5, 2, 3, 1.5, 2])
-                c1.write(f"**{nalog['ID Naloga']}** ({nalog['Tip']})")
-                c2.write(f"👤 {nalog['Komercijalist']}\n📅 {nalog['Datum Prikupa']}")
-                c3.write(f"🏢 **{nalog['Dobavljač']}**\n📍 *Prikup:* {nalog['Adresa Prikupa']}\n📦 {nalog['Opis robe']}")
-                
-                # Definiranje CSS klase za status
-                st_cls = "status-cekanje" if nalog['Status'] == "Na čekanju" else (
-                    "status-isprintano" if nalog['Status'] == "Isprintano" else (
-                        "status-prikupljeno" if nalog['Status'] == "Prikupljeno" else "status-storno"
-                    )
+            filtrirani = st.session_state.baza_naloga if odabrani_datum == "Svi datumi" else [x for x in st.session_state.baza_naloga if x["Datum Prikupa"] == odabrani_datum]
+
+            aktivni_u_filtru = [x for x in filtrirani if x["Status"] != "Storno"]
+            storno_u_filtru = [x for x in filtrirani if x["Status"] == "Storno"]
+            
+            st.markdown(f"📊 **Statistika:** Ukupno naloga: **{len(filtrirani)}** | Aktivnih za izvršenje: **{len(aktivni_u_filtru)}** | Storniranih: **{len(storno_u_filtru)}**")
+
+            st.divider()
+            col_act1, col_act2 = st.columns(2)
+
+            za_print = [x for x in filtrirani if x["Status"] in ["Na čekanju", "Isprintano"]]
+
+            if za_print:
+                pdf_bytes = generiraj_pdf_makromikro(za_print).getvalue()
+                col_act1.download_button(
+                    label=f"📄 Preuzmi PDF Zahtjev za Transport ({len(za_print)} aktivnih naloga)",
+                    data=pdf_bytes,
+                    file_name=f"Zahtjev_za_transport_{datetime.now().strftime('%Y-%m-%d')}.pdf",
+                    mime="application/pdf",
+                    type="primary"
                 )
-                c4.markdown(f"<span class='{st_cls}'>{nalog['Status']}</span>", unsafe_allow_html=True)
-
-                trenutni_index = statusi_opcije.index(nalog['Status']) if nalog['Status'] in statusi_opcije else 0
-
-                novi_status = c5.selectbox(
-                    "Status",
-                    statusi_opcije,
-                    index=trenutni_index,
-                    key=f"status_{nalog['ID Naloga']}_{i}"
-                )
-
-                if novi_status != nalog['Status']:
-                    vrijeme = datetime.now().strftime("%d.%m.%Y. %H:%M") if novi_status == "Prikupljeno" else "-"
-                    azuriraj_status_naloga(nalog['ID Naloga'], novi_status, vrijeme)
+                if col_act1.button("✏️ Označi ove naloge kao 'Isprintano'"):
+                    for item in za_print:
+                        if item["Status"] == "Na čekanju":
+                            azuriraj_status_naloga(item["ID Naloga"], "Isprintano")
                     st.session_state.baza_naloga = ucitaj_naloge()
                     st.rerun()
+            else:
+                col_act1.info("Nema aktivnih naloga spremnih za ispis.")
 
-                st.markdown("<hr style='margin:8px 0; border:0.5px solid #eee;'>", unsafe_allow_html=True)
+            if col_act2.button("✅ Označi SVE prikazane aktivne naloge kao PRIKUPLJENO"):
+                sada_str = datetime.now().strftime("%d.%m.%Y. %H:%M")
+                brojac = 0
+                for item in filtrirani:
+                    if item["Status"] in ["Na čekanju", "Isprintano"]:
+                        azuriraj_status_naloga(item["ID Naloga"], "Prikupljeno", sada_str)
+                        brojac += 1
+                st.session_state.baza_naloga = ucitaj_naloge()
+                st.success(f"Status promijenjen u 'Prikupljeno' za {brojac} naloga!")
+                st.rerun()
+
+            st.divider()
+            st.subheader("Pojedinačne postavke naloga")
+
+            statusi_opcije = ["Na čekanju", "Isprintano", "Prikupljeno", "Storno"]
+
+            for i, nalog in enumerate(filtrirani):
+                with st.container():
+                    c1, c2, c3, c4, c5 = st.columns([1.5, 2, 3, 1.5, 2])
+                    c1.write(f"**{nalog['ID Naloga']}** ({nalog['Tip']})")
+                    c2.write(f"👤 {nalog['Komercijalist']}\n📅 {nalog['Datum Prikupa']}")
+                    c3.write(f"🏢 **{nalog['Dobavljač']}**\n📍 *Prikup:* {nalog['Adresa Prikupa']}\n📦 {nalog['Opis robe']}")
+                    
+                    st_cls = "status-cekanje" if nalog['Status'] == "Na čekanju" else (
+                        "status-isprintano" if nalog['Status'] == "Isprintano" else (
+                            "status-prikupljeno" if nalog['Status'] == "Prikupljeno" else "status-storno"
+                        )
+                    )
+                    c4.markdown(f"<span class='{st_cls}'>{nalog['Status']}</span>", unsafe_allow_html=True)
+
+                    trenutni_index = statusi_opcije.index(nalog['Status']) if nalog['Status'] in statusi_opcije else 0
+
+                    novi_status = c5.selectbox(
+                        "Status",
+                        statusi_opcije,
+                        index=trenutni_index,
+                        key=f"status_{nalog['ID Naloga']}_{i}"
+                    )
+
+                    if novi_status != nalog['Status']:
+                        vrijeme = datetime.now().strftime("%d.%m.%Y. %H:%M") if novi_status == "Prikupljeno" else "-"
+                        azuriraj_status_naloga(nalog['ID Naloga'], novi_status, vrijeme)
+                        st.session_state.baza_naloga = ucitaj_naloge()
+                        st.rerun()
+
+                    st.markdown("<hr style='margin:8px 0; border:0.5px solid #eee;'>", unsafe_allow_html=True)
