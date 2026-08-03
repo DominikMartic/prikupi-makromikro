@@ -14,9 +14,6 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 
 st.set_page_config(page_title="Makromikro - Prikupi & Povrati", layout="wide", page_icon="📦")
 
-# === POSTAVKE PRISTUPA ===
-ADMIN_LOZINKA = "admin123"  # <--- OVDJE PROMIJENITE SVOJU ADMIN LOZINKU
-
 # === PODACI ZA KONEKCIJU NA SUPABASE BAZU ===
 SUPABASE_URL = "https://mxirprzgxtiwyhrmkyxv.supabase.co".strip()
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14aXJwcnpneHRpd3locm1reXh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3ODQ4ODAsImV4cCI6MjEwMTM2MDg4MH0.6RSbGJ3T89rUY_tFBnv5QvQspNY_7FakipZWvdiEbpg".strip()
@@ -111,15 +108,32 @@ def azuriraj_status_naloga(id_naloga, novi_status, vrijeme_obrade="-"):
         except Exception as e:
             st.error(f"Greška pri ažuriranju: {e}")
 
-# Inicijalizacija baze i autentičnosti u session_state
+def obrisi_sve_naloge():
+    if supabase:
+        try:
+            supabase.table("nalozi").delete().neq("id", "NEPOSTOJEĆI_ID").execute()
+        except Exception as e:
+            st.error(f"Greška pri brisanju naloga: {e}")
+
+def obrisi_sve_dobavljace():
+    if supabase:
+        try:
+            supabase.table("dobavljaci").delete().neq("naziv", "NEPOSTOJEĆI_NAZIV").execute()
+        except Exception as e:
+            st.error(f"Greška pri brisanju dobavljača: {e}")
+
+# Inicijalizacija sesije
 if "baza_naloga" not in st.session_state:
     st.session_state.baza_naloga = ucitaj_naloge()
 
 if "baza_dobavljaca" not in st.session_state:
     st.session_state.baza_dobavljaca = ucitaj_dobavljace()
 
-if "is_admin" not in st.session_state:
-    st.session_state.is_admin = False
+if "is_logged_in" not in st.session_state:
+    st.session_state.is_logged_in = False
+
+if "user_role" not in st.session_state:
+    st.session_state.user_role = None  # Može biti "komercijalist" ili "admin"
 
 st.markdown("""
     <style>
@@ -133,6 +147,37 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("📦 MAKROMIKRO GRUPA — Upravljanje Prikupima i Povratima")
+
+# --- SUSTAV ZA PRIJAVU (EKRAN ZA LOGIN AKO NIJE PRIJAVLJEN) ---
+if not st.session_state.is_logged_in:
+    st.warning("🔒 Za pristup aplikaciji obavezna je prijava.")
+    
+    col_l1, col_l2, _ = st.columns([1.5, 1.5, 3])
+    with col_l1:
+        unesena_lozinka = st.text_input("Unesite pristupnu lozinku:", type="password")
+        if st.button("Prijavi se", type="primary"):
+            # Ovdje definiramo lozinke
+            if unesena_lozinka == "admin123":
+                st.session_state.is_logged_in = True
+                st.session_state.user_role = "admin"
+                st.success("Uspješna prijava kao Voditelj/Admin!")
+                st.rerun()
+            elif unesena_lozinka == "komercijalist123":
+                st.session_state.is_logged_in = True
+                st.session_state.user_role = "komercijalist"
+                st.success("Uspješna prijava kao Komercijalist!")
+                st.rerun()
+            else:
+                st.error("Pogrešna lozinka!")
+    st.stop() # Zaustavlja daljnje učitavanje stranice dok se korisnik ne prijavi
+
+# --- GLAVNI DIO APLIKACIJE (KADA JE KORISNIK PRIJAVLJEN) ---
+c_top1, c_top2 = st.columns([4, 1])
+c_top1.info(f"Prijavljeni ste kao: **{st.session_state.user_role.upper()}**")
+if c_top2.button("🔒 Odjava"):
+    st.session_state.is_logged_in = False
+    st.session_state.user_role = None
+    st.rerun()
 
 def nadji_logo():
     moguce_opcije = ["logo.png", "logo.jpg", "logo.jpeg", "logo.PNG", "LOGO.PNG", "LOGO.JPG"]
@@ -252,11 +297,10 @@ def generiraj_pdf_makromikro(nalozi_list):
     return buffer
 
 
-# --- SUČELJE APLIKACIJE ---
 tab1, tab2 = st.tabs(["➕ Unos Novog Naloga", "📋 Pregled, Print & Upravljanje"])
 
 with tab1:
-    st.subheader("Unos novog naloga (Otvoreno za sve komercijaliste)")
+    st.subheader("Unos novog naloga")
 
     dobavljaci_dict = st.session_state.baza_dobavljaca
     lista_dobavljaca = ["Novi dobavljač..."] + sorted(list(dobavljaci_dict.keys()))
@@ -324,28 +368,7 @@ with tab1:
                 st.success(f"Nalog {id_naloga} uspješno spremljen! Podaci o dobavljaču zapamćeni za ubuduće.")
 
 with tab2:
-    # --- ZAGLAVLJE ZA PRIJAVU AKO ŽELITE UPRAVLJATI ---
-    c_prijava1, c_prijava2 = st.columns([3, 1])
-    
-    with c_prijava2:
-        if not st.session_state.is_admin:
-            with st.popover("🔑 Prijava za Upravljanje"):
-                st.write("**Urednički pristup**")
-                lozinka_input = st.text_input("Lozinka:", type="password")
-                if st.button("Prijavi se"):
-                    if lozinka_input == ADMIN_LOZINKA:
-                        st.session_state.is_admin = True
-                        st.success("Uspješna prijava!")
-                        st.rerun()
-                    else:
-                        st.error("Kriva lozinka!")
-        else:
-            st.success("🔓 Prijavljeni ste kao Voditelj")
-            if st.button("🔒 Odjavi se"):
-                st.session_state.is_admin = False
-                st.rerun()
-
-    c_prijava1.subheader("📋 Pregled svih unesenih naloga")
+    st.subheader("📋 Pregled svih unesenih naloga")
 
     if st.button("🔄 Osvježi podatke iz baze"):
         st.session_state.baza_naloga = ucitaj_naloge()
@@ -368,10 +391,9 @@ with tab2:
 
         st.divider()
 
-        # AKCIJE (Dostupne samo kad je st.session_state.is_admin == True)
-        if st.session_state.is_admin:
+        # AKCIJE (Dostupne SAMO za ADMINA)
+        if st.session_state.user_role == "admin":
             col_act1, col_act2 = st.columns(2)
-
             za_print = [x for x in filtrirani if x["Status"] in ["Na čekanju", "Isprintano"]]
 
             if za_print:
@@ -404,6 +426,23 @@ with tab2:
                 st.rerun()
 
             st.divider()
+            
+            # Opcija čišćenja baze za admina
+            with st.expander("⚠️ Opasna zona / Čišćenje baze"):
+                c_brisi1, c_brisi2 = st.columns(2)
+                if c_brisi1.button("🗑️ Obriši SVE naloge"):
+                    if st.checkbox("Potvrdi brisanje naloga", key="p_nalozi"):
+                        obrisi_sve_naloge()
+                        st.session_state.baza_naloga = ucitaj_naloge()
+                        st.success("Nalozi obrisani!")
+                        st.rerun()
+                if c_brisi2.button("🗑️ Obriši SVE dobavljače"):
+                    if st.checkbox("Potvrdi brisanje dobavljača", key="p_dob"):
+                        obrisi_sve_dobavljace()
+                        st.session_state.baza_dobavljaca = ucitaj_dobavljace()
+                        st.success("Dobavljači obrisani!")
+                        st.rerun()
+            st.divider()
 
         statusi_opcije = ["Na čekanju", "Isprintano", "Prikupljeno", "Storno"]
 
@@ -421,8 +460,8 @@ with tab2:
                 )
                 c4.markdown(f"<span class='{st_cls}'>{nalog['Status']}</span>", unsafe_allow_html=True)
 
-                # Samo ako je otključano prijavom dozvoli promjenu
-                if st.session_state.is_admin:
+                # Promjena statusa dozvoljena samo ako je admin
+                if st.session_state.user_role == "admin":
                     trenutni_index = statusi_opcije.index(nalog['Status']) if nalog['Status'] in statusi_opcije else 0
 
                     novi_status = c5.selectbox(
@@ -438,6 +477,6 @@ with tab2:
                         st.session_state.baza_naloga = ucitaj_naloge()
                         st.rerun()
                 else:
-                    c5.write("🔒 *Zaključano za promjene*")
+                    c5.write("🔒 *Samo pregled*")
 
                 st.markdown("<hr style='margin:8px 0; border:0.5px solid #eee;'>", unsafe_allow_html=True)
