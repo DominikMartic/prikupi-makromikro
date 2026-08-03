@@ -234,7 +234,6 @@ def clean_txt(text):
 
 def generiraj_pdf_makromikro(nalozi_list):
     buffer = io.BytesIO()
-    # A4 širina je 595.27 bodova. S marginama od 35 sa svake strane, raspoloživa širina je 525 bodova.
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
@@ -243,9 +242,6 @@ def generiraj_pdf_makromikro(nalozi_list):
     story = []
     styles = getSampleStyleSheet()
 
-    # Povećane veličine fontova za bolju čitljivost u PDF-u
-    header_title = ParagraphStyle('HeaderTitle', parent=styles['Normal'], fontSize=20, fontName='Helvetica-Bold', textColor=colors.HexColor('#003366'))
-    header_sub = ParagraphStyle('HeaderSub', parent=styles['Normal'], fontSize=10, fontName='Helvetica', textColor=colors.HexColor('#333333'), alignment=2, leading=14)
     doc_title = ParagraphStyle('DocTitle', parent=styles['Heading1'], fontSize=16, fontName='Helvetica-Bold', alignment=1, spaceAfter=15, textColor=colors.HexColor('#003366'))
     
     lbl_style = ParagraphStyle('Lbl', parent=styles['Normal'], fontSize=11, fontName='Helvetica-Bold', leading=15)
@@ -262,20 +258,9 @@ def generiraj_pdf_makromikro(nalozi_list):
                 logo_element = Image(putanja_loga, width=525, height=70)
                 logo_element.hAlign = 'CENTER'
                 story.append(logo_element)
-                story.append(Spacer(1, 10))
+                story.append(Spacer(1, 15))
             except Exception:
                 pass
-
-        # Podaci o tvrtki i osnovne info ispod loga preko cijele širine
-        info_text = Paragraph("<b>Makromikro grupa d.o.o.</b><br/>Vukomericka ulica 6, 10410 Velika Gorica, Hrvatska<br/>OIB: 50467974870", header_sub)
-        
-        info_table = Table([[info_text]], colWidths=[525])
-        info_table.setStyle(TableStyle([
-            ('ALIGN', (0,0), (-1,-1), 'RIGHT'),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 5),
-        ]))
-        story.append(info_table)
-        story.append(Spacer(1, 10))
 
         naslov_dokumenta = f"ZAHTJEV ZA TRANSPORT — {clean_txt(n['Tip']).upper()} ({clean_txt(n['ID Naloga'])})"
         story.append(Paragraph(naslov_dokumenta, doc_title))
