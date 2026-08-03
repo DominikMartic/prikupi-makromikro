@@ -4,3 +4,4 @@ reportlab
 Pillow
 st-gsheets-connection
 supabase
+qrcode[pil]
