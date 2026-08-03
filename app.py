@@ -122,7 +122,7 @@ def obrisi_sve_dobavljace():
         except Exception as e:
             st.error(f"Greška pri brisanju dobavljača: {e}")
 
-# Inicijalizacija sesije i provjera trajne prijave preko URL/Session parametara
+# Inicijalizacija sesije
 if "baza_naloga" not in st.session_state:
     st.session_state.baza_naloga = ucitaj_naloge()
 
@@ -138,26 +138,95 @@ if "user_role" not in st.session_state:
 if "ponovi_prikup_data" not in st.session_state:
     st.session_state.ponovi_prikup_data = None
 
-# Automatska provjera spremljene uloge u lokalnoj sesiji preglednika (ili Streamlit state-u)
 query_params = st.query_params
 if not st.session_state.is_logged_in and "role" in query_params:
     st.session_state.is_logged_in = True
     st.session_state.user_role = query_params["role"]
 
+# --- MODERNI UI & CSS DIZAJN ---
 st.markdown("""
     <style>
-    .main { background-color: #f8f9fa; }
-    .stButton>button { border-radius: 6px; font-weight: bold; }
-    .status-cekanje { background-color: #ffeba2; color: #856404; padding: 4px 8px; border-radius: 4px; font-weight: bold; }
-    .status-isprintano { background-color: #b8daff; color: #004085; padding: 4px 8px; border-radius: 4px; font-weight: bold; }
-    .status-prikupljeno { background-color: #c3e6cb; color: #155724; padding: 4px 8px; border-radius: 4px; font-weight: bold; }
-    .status-storno { background-color: #f8d7da; color: #721c24; padding: 4px 8px; border-radius: 4px; font-weight: bold; text-decoration: line-through; }
+    /* Glavna pozadina i fontovi */
+    .main { background-color: #f4f6f9; }
+    
+    /* Kartice s blagom sjenom i zaobljenim rubovima */
+    div.stContainer {
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        padding: 16px;
+        border-radius: 12px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        margin-bottom: 12px;
+    }
+    
+    /* Gumbi */
+    .stButton>button { 
+        border-radius: 8px; 
+        font-weight: 600; 
+        transition: all 0.2s ease-in-out;
+    }
+    
+    /* Moderne oznake statusa (Badges) */
+    .status-cekanje { 
+        background-color: #fef3c7; 
+        color: #92400e; 
+        padding: 6px 12px; 
+        border-radius: 20px; 
+        font-weight: 600; 
+        font-size: 0.85rem;
+        display: inline-block;
+    }
+    .status-isprintano { 
+        background-color: #e0f2fe; 
+        color: #0369a1; 
+        padding: 6px 12px; 
+        border-radius: 20px; 
+        font-weight: 600; 
+        font-size: 0.85rem;
+        display: inline-block;
+    }
+    .status-prikupljeno { 
+        background-color: #dcfce7; 
+        color: #166534; 
+        padding: 6px 12px; 
+        border-radius: 20px; 
+        font-weight: 600; 
+        font-size: 0.85rem;
+        display: inline-block;
+    }
+    .status-storno { 
+        background-color: #fee2e2; 
+        color: #991b1b; 
+        padding: 6px 12px; 
+        border-radius: 20px; 
+        font-weight: 600; 
+        font-size: 0.85rem;
+        text-decoration: line-through;
+        display: inline-block;
+    }
+    
+    /* Stil tabova */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background-color: #ffffff;
+        border-radius: 8px 8px 0px 0px;
+        padding: 10px 20px;
+        font-weight: 600;
+        border: 1px solid #e2e8f0;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #ffffff !important;
+        border-bottom: 3px solid #0284c7 !important;
+        color: #0284c7 !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
 st.title("📦 MAKROMIKRO GRUPA — Upravljanje Prikupima i Povratima")
 
-# --- SUSTAV ZA PRIJAVU SA "ZAPAMTI ME" ---
+# --- SUSTAV ZA PRIJAVU ---
 if not st.session_state.is_logged_in:
     st.warning("🔒 Za pristup aplikaciji obavezna je prijava.")
     
@@ -177,7 +246,6 @@ if not st.session_state.is_logged_in:
                  st.session_state.is_logged_in = True
                  st.session_state.user_role = odabrana_uloga
                  
-                 # Ako je odabrano "Zapamti me", spremamo u URL/Token preglednika
                  if zapamti_me:
                      st.query_params["role"] = odabrana_uloga
                      
@@ -189,12 +257,11 @@ if not st.session_state.is_logged_in:
 
 # --- GLAVNI DIO APLIKACIJE ---
 c_top1, c_top2 = st.columns([4, 1])
-c_top1.info(f"Prijavljeni ste kao: **{st.session_state.user_role.upper()}**")
+c_top1.info(f"Prijavljeni korisnik: **{st.session_state.user_role.upper()}**")
 if c_top2.button("🔒 Odjava"):
     st.session_state.is_logged_in = False
     st.session_state.user_role = None
     st.session_state.ponovi_prikup_data = None
-    # Brišemo spremljenu ulogu iz preglednika kod odjave
     if "role" in st.query_params:
         del st.query_params["role"]
     st.rerun()
@@ -514,9 +581,9 @@ with tab2:
         for i, nalog in enumerate(filtrirani):
             with st.container():
                 c1, c2, c3, c4, c5 = st.columns([1.5, 2, 2.5, 1.5, 2.5])
-                c1.write(f"**{nalog['ID Naloga']}** ({nalog['Tip']})")
-                c2.write(f"👤 {nalog['Komercijalist']}\n📅 {nalog['Datum Prikupa']}")
-                c3.write(f"🏢 **{nalog['Dobavljač']}**\n📍 {nalog['Adresa Prikupa']}\n📦 {nalog['Opis robe']}")
+                c1.write(f"**{nalog['ID Naloga']}**\n\n`{nalog['Tip']}`")
+                c2.write(f"👤 **{nalog['Komercijalist']}**\n📅 {nalog['Datum Prikupa']}")
+                c3.write(f"🏢 **{nalog['Dobavljač']}**\n📍 {nalog['Adresa Prikupa']}\n📦 _{nalog['Opis robe']}_")
                 
                 st_cls = "status-cekanje" if nalog['Status'] == "Na čekanju" else (
                     "status-isprintano" if nalog['Status'] == "Isprintano" else (
@@ -533,7 +600,7 @@ with tab2:
 
                         novi_status = st.selectbox(
                             "Status",
-                        statusi_opcije,
+                            statusi_opcije,
                             index=trenutni_index,
                             key=f"status_{nalog['ID Naloga']}_{i}"
                         )
@@ -561,4 +628,4 @@ with tab2:
                         st.session_state.ponovi_prikup_data = nalog
                         st.success("Podaci kopirani! Prebacite se na karticu 'Unos Novog Naloga'.")
 
-                st.markdown("<hr style='margin:8px 0; border:0.5px solid #eee;'>", unsafe_allow_html=True)
+                st.markdown("<hr style='margin:4px 0; border:0.2px solid #f1f5f9;'>", unsafe_allow_html=True)
