@@ -242,13 +242,14 @@ def generiraj_pdf_makromikro(nalozi_list):
     story = []
     styles = getSampleStyleSheet()
 
-    header_title = ParagraphStyle('HeaderTitle', parent=styles['Normal'], fontSize=16, fontName='Helvetica-Bold', textColor=colors.HexColor('#003366'))
-    header_sub = ParagraphStyle('HeaderSub', parent=styles['Normal'], fontSize=8, fontName='Helvetica', textColor=colors.HexColor('#333333'), leading=11)
-    doc_title = ParagraphStyle('DocTitle', parent=styles['Heading1'], fontSize=15, fontName='Helvetica-Bold', alignment=1, spaceAfter=15, textColor=colors.HexColor('#003366'))
+    # Povećane veličine fontova za bolju čitljivost u PDF-u
+    header_title = ParagraphStyle('HeaderTitle', parent=styles['Normal'], fontSize=18, fontName='Helvetica-Bold', textColor=colors.HexColor('#003366'))
+    header_sub = ParagraphStyle('HeaderSub', parent=styles['Normal'], fontSize=10, fontName='Helvetica', textColor=colors.HexColor('#333333'), leading=14)
+    doc_title = ParagraphStyle('DocTitle', parent=styles['Heading1'], fontSize=16, fontName='Helvetica-Bold', alignment=1, spaceAfter=15, textColor=colors.HexColor('#003366'))
     
-    lbl_style = ParagraphStyle('Lbl', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold', leading=12)
-    val_style = ParagraphStyle('Val', parent=styles['Normal'], fontSize=9, fontName='Helvetica', leading=12)
-    sec_hdr = ParagraphStyle('SecHdr', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold', textColor=colors.HexColor('#003366'))
+    lbl_style = ParagraphStyle('Lbl', parent=styles['Normal'], fontSize=11, fontName='Helvetica-Bold', leading=15)
+    val_style = ParagraphStyle('Val', parent=styles['Normal'], fontSize=11, fontName='Helvetica', leading=15)
+    sec_hdr = ParagraphStyle('SecHdr', parent=styles['Normal'], fontSize=11, fontName='Helvetica-Bold', textColor=colors.HexColor('#003366'))
 
     putanja_loga = nadji_logo()
     aktivni_nalozi = [n for n in nalozi_list if n['Status'] != 'Storno']
@@ -256,7 +257,7 @@ def generiraj_pdf_makromikro(nalozi_list):
     for idx, n in enumerate(aktivni_nalozi):
         if putanja_loga:
             try:
-                logo_element = Image(putanja_loga, width=150, height=45)
+                logo_element = Image(putanja_loga, width=160, height=50)
                 logo_element.hAlign = 'LEFT'
             except Exception:
                 logo_element = Paragraph("<b>makromikro</b><br/><font color='#cc0000'><b>GRUPA</b></font>", header_title)
@@ -291,40 +292,40 @@ def generiraj_pdf_makromikro(nalozi_list):
             ('VALIGN', (0,0), (-1,-1), 'TOP'),
             ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cccccc')),
             ('BACKGROUND', (0,0), (0,-1), colors.HexColor('#f4f6f8')),
-            ('PADDING', (0,0), (-1,-1), 6),
+            ('PADDING', (0,0), (-1,-1), 8),
         ]))
         story.append(t_podaci)
         story.append(Spacer(1, 15))
 
         story.append(Paragraph("- ispunjava vozac", sec_hdr))
-        story.append(Spacer(1, 3))
+        story.append(Spacer(1, 4))
         
         vozac_data = [
             [Paragraph("Prijevoz je izvrsio (ime i prezime vozaca):", val_style), Paragraph("Datum:", val_style), Paragraph("Potpis:", val_style)],
-            ["\n", "", ""]
+            ["\n\n", "", ""]
         ]
         t_vozac = Table(vozac_data, colWidths=[240, 140, 145])
         t_vozac.setStyle(TableStyle([
             ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#aaaaaa')),
             ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#e9ecef')),
-            ('PADDING', (0,0), (-1,-1), 5),
+            ('PADDING', (0,0), (-1,-1), 6),
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ]))
         story.append(t_vozac)
         story.append(Spacer(1, 15))
 
         story.append(Paragraph("- ispunjava skladistar na prijemu robe u skladistu", sec_hdr))
-        story.append(Spacer(1, 3))
+        story.append(Spacer(1, 4))
         
         skladiste_data = [
             [Paragraph("Robu preuzeo i kontrolirao (ime i prezime):", val_style), Paragraph("Datum:", val_style), Paragraph("Potpis:", val_style)],
-            ["\n", "", ""]
+            ["\n\n", "", ""]
         ]
         t_skladiste = Table(skladiste_data, colWidths=[240, 140, 145])
         t_skladiste.setStyle(TableStyle([
             ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#aaaaaa')),
             ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#e9ecef')),
-            ('PADDING', (0,0), (-1,-1), 5),
+            ('PADDING', (0,0), (-1,-1), 6),
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ]))
         story.append(t_skladiste)
