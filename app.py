@@ -13,7 +13,30 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 
 st.set_page_config(page_title="Makromikro - Prikupi & Povrati", layout="wide", page_icon="📦")
 
-# CSS Stilovi za sučelje
+CSV_FILE = "nalozi.csv"
+
+# --- FUNKCIJE ZA TRAJNO SPREMANJE I UČITAVANJE PODATAKA ---
+def ucitaj_naloge():
+    if os.path.exists(CSV_FILE):
+        try:
+            df = pd.read_csv(CSV_FILE, dtype=str)
+            return df.fillna("-").to_dict('records')
+        except Exception:
+            return []
+    return []
+
+def spremi_naloge(nalozi_list):
+    if nalozi_list:
+        df = pd.DataFrame(nalozi_list)
+        df.to_csv(CSV_FILE, index=False)
+    else:
+        if os.path.exists(CSV_FILE):
+            os.remove(CSV_FILE)
+
+# Inicijalizacija baze u session_state iz CSV datoteke
+if "baza_naloga" not in st.session_state:
+    st.session_state.baza_naloga = ucitaj_naloge()
+
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
@@ -24,19 +47,23 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-if "baza_naloga" not in st.session_state:
-    st.session_state.baza_naloga = []
-
 st.title("📦 MAKROMIKRO GRUPA — Upravljanje Prikupima i Povratima")
 
-# Pomoćna funkcija za siguran unos teksta u PDF
+# Pronađi logo ako postoji
+def nadji_logo():
+    moguce_opcije = ["logo.png", "logo.jpg", "logo.jpeg", "logo.PNG", "LOGO.PNG", "LOGO.JPG"]
+    for f in moguce_opcije:
+        if os.path.exists(f):
+            return f
+    return None
+
 def clean_txt(text):
     if not text:
         return "-"
     escaped = html.escape(str(text))
     return escaped.replace('\n', '<br/>')
 
-# FUNKCIJA ZA DOKUMENT IDENTIČAN VAŠEM PDF OBRAZCU
+# FUNKCIJA ZA GENERIRANJE PDF-A
 def generiraj_pdf_makromikro(nalozi_list):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -47,7 +74,6 @@ def generiraj_pdf_makromikro(nalozi_list):
     story = []
     styles = getSampleStyleSheet()
 
-    # Stilovi teksta
     header_title = ParagraphStyle('HeaderTitle', parent=styles['Normal'], fontSize=16, fontName='Helvetica-Bold', textColor=colors.HexColor('#003366'))
     header_sub = ParagraphStyle('HeaderSub', parent=styles['Normal'], fontSize=8, fontName='Helvetica', textColor=colors.HexColor('#333333'), leading=11)
     doc_title = ParagraphStyle('DocTitle', parent=styles['Heading1'], fontSize=15, fontName='Helvetica-Bold', alignment=1, spaceAfter=15, textColor=colors.HexColor('#003366'))
@@ -56,11 +82,15 @@ def generiraj_pdf_makromikro(nalozi_list):
     val_style = ParagraphStyle('Val', parent=styles['Normal'], fontSize=9, fontName='Helvetica', leading=12)
     sec_hdr = ParagraphStyle('SecHdr', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold', textColor=colors.HexColor('#003366'))
 
+    putanja_loga = nadji_logo()
+
     for idx, n in enumerate(nalozi_list):
-        # 1. ZAGLAVLJE FIRME (Slika logo ako postoji, inače stilizirani tekst)
-        if os.path.exists("logo.png"):
-            logo_element = Image("logo.png", width=160, height=50)
-            logo_element.hAlign = 'LEFT'
+        if putanja_loga:
+            try:
+                logo_element = Image(putanja_loga, width=150, height=45)
+                logo_element.hAlign = 'LEFT'
+            except Exception:
+                logo_element = Paragraph("<b>makromikro</b><br/><font color='#cc0000'><b>GRUPA</b></font>", header_title)
         else:
             logo_element = Paragraph("<b>makromikro</b><br/><font color='#cc0000'><b>GRUPA</b></font>", header_title)
 
@@ -74,11 +104,9 @@ def generiraj_pdf_makromikro(nalozi_list):
         story.append(header_table)
         story.append(Spacer(1, 15))
 
-        # 2. NASLOV DOKUMENTA
         naslov_dokumenta = f"ZAHTJEV ZA TRANSPORT — {clean_txt(n['Tip']).upper()} ({clean_txt(n['ID Naloga'])})"
         story.append(Paragraph(naslov_dokumenta, doc_title))
 
-        # 3. TABLICA S OSNOVNIM PODACIMA
         podaci = [
             [Paragraph("Podnositelj zahtjeva:", lbl_style), Paragraph(clean_txt(n['Komercijalist']), val_style)],
             [Paragraph("Datum i vrijeme:", lbl_style), Paragraph(clean_txt(n['Datum Prikupa']), val_style)],
@@ -99,7 +127,6 @@ def generiraj_pdf_makromikro(nalozi_list):
         story.append(t_podaci)
         story.append(Spacer(1, 15))
 
-        # 4. SEKCIJA VOZAČ
         story.append(Paragraph("- ispunjava vozač", sec_hdr))
         story.append(Spacer(1, 3))
         
@@ -117,7 +144,6 @@ def generiraj_pdf_makromikro(nalozi_list):
         story.append(t_vozac)
         story.append(Spacer(1, 15))
 
-        # 5. SEKCIJA SKLADIŠTAR
         story.append(Paragraph("- ispunjava skladištar na prijemu robe u skladištu", sec_hdr))
         story.append(Spacer(1, 3))
         
@@ -146,6 +172,12 @@ def generiraj_pdf_makromikro(nalozi_list):
 tab1, tab2 = st.tabs(["➕ Unos Novog Naloga", "📋 Pregled, Print & Upravljanje"])
 
 with tab1:
+    postojeci_logo = nadji_logo()
+    if postojeci_logo:
+        st.success(f"🖼️ Logo pronađen: `{postojeci_logo}`")
+    else:
+        st.warning("⚠️ Logo nije pronađen (`logo.png`).")
+
     st.subheader("Unos novog naloga (Komercijalist)")
     with st.form("forma_unos", clear_on_submit=True):
         c1, c2, c3 = st.columns(3)
@@ -161,8 +193,8 @@ with tab1:
         adresa_prikupa = c6.text_input("Adresa prikupljanja", placeholder="npr. Tina Ujevića 28, Dugo Selo")
         adresa_dostave = c7.text_input("Adresa dostave", value="Makromikro grupa d.o.o., Vukomerička ulica 6, 10410 Velika Gorica")
 
-        opis = st.text_area("Vrsta robe / Opis i količina (npr. Narudžba 9344 - vrećice za usisavač, 1 kom)")
-        napomena = st.text_input("Napomena za vozača (npr. Nazvati 30 min prije dolaska)")
+        opis = st.text_area("Vrsta robe / Opis i količina")
+        napomena = st.text_input("Napomena za vozača")
 
         submit = st.form_submit_button("Spremi Nalog", type="primary")
 
@@ -174,7 +206,7 @@ with tab1:
                 prefiks = "PR" if tip == "Prikup" else "POV"
                 id_naloga = f"{prefiks}-2026-{broj:03d}"
                 
-                st.session_state.baza_naloga.append({
+                novi_nalog = {
                     "ID Naloga": id_naloga,
                     "Tip": tip,
                     "Komercijalist": komercijalist,
@@ -184,11 +216,13 @@ with tab1:
                     "Adresa Prikupa": adresa_prikupa,
                     "Adresa Dostave": adresa_dostave,
                     "Opis robe": opis,
-                    "Napomena": napomena,
+                    "Napomena": napomena or "-",
                     "Status": "Na čekanju",
                     "Vrijeme Obrade": "-"
-                })
-                st.success(f"Nalog {id_naloga} spremljen pod 'Na čekanju'!")
+                }
+                st.session_state.baza_naloga.append(novi_nalog)
+                spremi_naloge(st.session_state.baza_naloga)  # Trajno spremanje u CSV
+                st.success(f"Nalog {id_naloga} uspuješno spremljen!")
 
 with tab2:
     st.subheader("Filtriranje i Upravljanje Nalozima")
@@ -220,6 +254,7 @@ with tab2:
                 for item in za_print:
                     if item["Status"] == "Na čekanju":
                         item["Status"] = "Isprintano"
+                spremi_naloge(st.session_state.baza_naloga)
                 st.rerun()
         else:
             col_act1.info("Nema naloga spremnih za ispis.")
@@ -232,6 +267,7 @@ with tab2:
                     item["Status"] = "Prikupljeno"
                     item["Vrijeme Obrade"] = sada_str
                     brojac += 1
+            spremi_naloge(st.session_state.baza_naloga)
             st.success(f"Status promijenjen u 'Prikupljeno' za {brojac} naloga!")
             st.rerun()
 
@@ -259,6 +295,7 @@ with tab2:
                     nalog['Status'] = novi_status
                     if novi_status == "Prikupljeno":
                         nalog['Vrijeme Obrade'] = datetime.now().strftime("%d.%m.%Y. %H:%M")
+                    spremi_naloge(st.session_state.baza_naloga)
                     st.rerun()
 
                 st.markdown("<hr style='margin:8px 0; border:0.5px solid #eee;'>", unsafe_allow_html=True)
