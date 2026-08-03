@@ -4,6 +4,7 @@ from datetime import datetime
 import io
 import html
 import os
+import qrcode
 from supabase import create_client, Client
 
 # ReportLab za profesionalni PDF izgled
@@ -232,6 +233,16 @@ def clean_txt(text):
     escaped = html.escape(str(text))
     return escaped.replace('\n', '<br/>')
 
+def generiraj_qr_sliku(sadrzaj):
+    qr = qrcode.QRCode(box_size=2, border=1)
+    qr.add_data(sadrzaj)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    buffer.seek(0)
+    return buffer
+
 def generiraj_pdf_makromikro(nalozi_list):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -242,7 +253,7 @@ def generiraj_pdf_makromikro(nalozi_list):
     story = []
     styles = getSampleStyleSheet()
 
-    doc_title = ParagraphStyle('DocTitle', parent=styles['Heading1'], fontSize=16, fontName='Helvetica-Bold', alignment=1, spaceAfter=15, textColor=colors.HexColor('#003366'))
+    doc_title = ParagraphStyle('DocTitle', parent=styles['Heading1'], fontSize=15, fontName='Helvetica-Bold', textColor=colors.HexColor('#003366'))
     
     lbl_style = ParagraphStyle('Lbl', parent=styles['Normal'], fontSize=11, fontName='Helvetica-Bold', leading=15)
     val_style = ParagraphStyle('Val', parent=styles['Normal'], fontSize=11, fontName='Helvetica', leading=15)
@@ -252,18 +263,36 @@ def generiraj_pdf_makromikro(nalozi_list):
     aktivni_nalozi = [n for n in nalozi_list if n['Status'] != 'Storno']
 
     for idx, n in enumerate(aktivni_nalozi):
-        # Logo razvučen preko pune širine stranice (525 bodova) kao uzglavlje
+        # Logo na vrhu (ako postoji)
         if putanja_loga:
             try:
                 logo_element = Image(putanja_loga, width=525, height=70)
                 logo_element.hAlign = 'CENTER'
                 story.append(logo_element)
-                story.append(Spacer(1, 15))
+                story.append(Spacer(1, 10))
             except Exception:
                 pass
 
-        naslov_dokumenta = f"ZAHTJEV ZA TRANSPORT — {clean_txt(n['Tip']).upper()} ({clean_txt(n['ID Naloga'])})"
-        story.append(Paragraph(naslov_dokumenta, doc_title))
+        # Naslov i QR kod smješteni u tablicu da budu u istoj liniji (naslov lijevo, QR kod desno)
+        id_naloga_txt = clean_txt(n['ID Naloga'])
+        naslov_tekst = f"ZAHTJEV ZA TRANSPORT — {clean_txt(n['Tip']).upper()} ({id_naloga_txt})"
+        p_naslov = Paragraph(naslov_tekst, doc_title)
+
+        # Generiranje QR koda za ovaj specifični nalog
+        try:
+            qr_buf = generiraj_qr_sliku(id_naloga_txt)
+            qr_img = Image(qr_buf, width=45, height=45)
+            qr_img.hAlign = 'RIGHT'
+        except Exception:
+            qr_img = Paragraph("", val_style)
+
+        t_zaglavlje = Table([[p_naslov, qr_img]], colWidths=[470, 55])
+        t_zaglavlje.setStyle(TableStyle([
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('ALIGN', (1,0), (1,0), 'RIGHT'),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 10),
+        ]))
+        story.append(t_zaglavlje)
 
         podaci = [
             [Paragraph("Podnositelj zahtjeva:", lbl_style), Paragraph(clean_txt(n['Komercijalist']), val_style)],
