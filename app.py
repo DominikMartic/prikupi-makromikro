@@ -18,12 +18,9 @@ st.set_page_config(page_title="Makromikro - Prikupi & Povrati", layout="wide", p
 SUPABASE_URL = "https://mxirprzgxtiwyhrmkyxv.supabase.co".strip()
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14aXJwcnpneHRpd3locm1reXh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3ODQ4ODAsImV4cCI6MjEwMTM2MDg4MH0.6RSbGJ3T89rUY_tFBnv5QvQspNY_7FakipZWvdiEbpg".strip()
 
-@st.cache_resource
+# Inicijalizacija bez st.cache_resource radi sigurnog osvježavanja ključa
 def init_supabase() -> Client:
-    # Očišćeni URL i ključ
-    clean_url = SUPABASE_URL.strip().rstrip('/')
-    clean_key = SUPABASE_KEY.strip()
-    return create_client(clean_url, clean_key)
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
 
 try:
     supabase = init_supabase()
@@ -62,7 +59,6 @@ def ucitaj_dobavljace():
         try:
             response = supabase.table("dobavljaci").select("*").order("naziv", desc=False).execute()
             data = response.data
-            # Vraća rječnik {naziv: {kontakt, adresa_prikupa, napomena}}
             return {d["naziv"]: d for d in data}
         except Exception:
             return {}
@@ -99,7 +95,6 @@ def spremi_novi_nalog(n):
                 "vrijeme_obrade": n["Vrijeme Obrade"]
             }
             supabase.table("nalozi").insert(data).execute()
-            # Spremi/ažuriraj i u bazi dobavljača za buduće automatsko popunjavanje
             spremi_ili_azuriraj_dobavljaca(n["Dobavljač"], n["Kontakt"], n["Adresa Prikupa"], n["Napomena"])
         except Exception as e:
             st.error(f"Greška pri spremanju u bazu: {e}")
@@ -128,6 +123,7 @@ st.markdown("""
     .status-cekanje { background-color: #ffeba2; color: #856404; padding: 4px 8px; border-radius: 4px; font-weight: bold; }
     .status-isprintano { background-color: #b8daff; color: #004085; padding: 4px 8px; border-radius: 4px; font-weight: bold; }
     .status-prikupljeno { background-color: #c3e6cb; color: #155724; padding: 4px 8px; border-radius: 4px; font-weight: bold; }
+    .status-storno { background-color: #f8d7da; color: #721c24; padding: 4px 8px; border-radius: 4px; font-weight: bold; text-decoration: line-through; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -146,7 +142,7 @@ def clean_txt(text):
     escaped = html.escape(str(text))
     return escaped.replace('\n', '<br/>')
 
-# FUNKCIJA ZA GENERIRANJE PDF-A
+# FUNKCIJA ZA GENERIRANJE PDF-A (Izostavlja stornirane naloge)
 def generiraj_pdf_makromikro(nalozi_list):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -166,8 +162,9 @@ def generiraj_pdf_makromikro(nalozi_list):
     sec_hdr = ParagraphStyle('SecHdr', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold', textColor=colors.HexColor('#003366'))
 
     putanja_loga = nadji_logo()
+    aktivni_nalozi = [n for n in nalozi_list if n['Status'] != 'Storno']
 
-    for idx, n in enumerate(nalozi_list):
+    for idx, n in enumerate(aktivni_nalozi):
         if putanja_loga:
             try:
                 logo_element = Image(putanja_loga, width=150, height=45)
@@ -243,7 +240,7 @@ def generiraj_pdf_makromikro(nalozi_list):
         ]))
         story.append(t_skladiste)
 
-        if idx < len(nalozi_list) - 1:
+        if idx < len(aktivni_nalozi) - 1:
             story.append(PageBreak())
 
     doc.build(story)
@@ -263,7 +260,6 @@ with tab1:
 
     st.subheader("Unos novog naloga (Komercijalist)")
 
-    # Učitavanje spremnih dobavljača iz baze
     dobavljaci_dict = st.session_state.baza_dobavljaca
     lista_dobavljaca = ["Novi dobavljač..."] + sorted(list(dobavljaci_dict.keys()))
 
@@ -332,7 +328,6 @@ with tab1:
 with tab2:
     st.subheader("Filtriranje i Upravljanje Nalozima")
     
-    # Osvježi podatke iz baze na gumb
     if st.button("🔄 Osvježi podatke iz baze"):
         st.session_state.baza_naloga = ucitaj_naloge()
         st.session_state.baza_dobavljaca = ucitaj_dobavljace()
@@ -347,6 +342,12 @@ with tab2:
 
         filtrirani = st.session_state.baza_naloga if odabrani_datum == "Svi datumi" else [x for x in st.session_state.baza_naloga if x["Datum Prikupa"] == odabrani_datum]
 
+        # --- PRIKAZ BROJAČA PRIKUPA ---
+        aktivni_u_filtru = [x for x in filtrirani if x["Status"] != "Storno"]
+        storno_u_filtru = [x for x in filtrirani if x["Status"] == "Storno"]
+        
+        st.markdown(f"📊 **Statistika za odabrani period:** Ukupno naloga: **{len(filtrirani)}** | Aktivnih za izvršenje: **{len(aktivni_u_filtru)}** | Storniranih: **{len(storno_u_filtru)}**")
+
         st.divider()
         col_act1, col_act2 = st.columns(2)
 
@@ -355,7 +356,7 @@ with tab2:
         if za_print:
             pdf_bytes = generiraj_pdf_makromikro(za_print).getvalue()
             col_act1.download_button(
-                label=f"📄 Preuzmi PDF Zahtjev za Transport ({len(za_print)} naloga)",
+                label=f"📄 Preuzmi PDF Zahtjev za Transport ({len(za_print)} aktivnih naloga)",
                 data=pdf_bytes,
                 file_name=f"Zahtjev_za_transport_{datetime.now().strftime('%Y-%m-%d')}.pdf",
                 mime="application/pdf",
@@ -368,9 +369,9 @@ with tab2:
                 st.session_state.baza_naloga = ucitaj_naloge()
                 st.rerun()
         else:
-            col_act1.info("Nema naloga spremnih za ispis.")
+            col_act1.info("Nema aktivnih naloga spremnih za ispis.")
 
-        if col_act2.button("✅ Označi SVE prikazane naloge kao PRIKUPLJENO"):
+        if col_act2.button("✅ Označi SVE prikazane aktivne naloge kao PRIKUPLJENO"):
             sada_str = datetime.now().strftime("%d.%m.%Y. %H:%M")
             brojac = 0
             for item in filtrirani:
@@ -384,6 +385,8 @@ with tab2:
         st.divider()
         st.subheader("Pojedinačne postavke naloga")
 
+        statusi_opcije = ["Na čekanju", "Isprintano", "Prikupljeno", "Storno"]
+
         for i, nalog in enumerate(filtrirani):
             with st.container():
                 c1, c2, c3, c4, c5 = st.columns([1.5, 2, 3, 1.5, 2])
@@ -391,13 +394,20 @@ with tab2:
                 c2.write(f"👤 {nalog['Komercijalist']}\n📅 {nalog['Datum Prikupa']}")
                 c3.write(f"🏢 **{nalog['Dobavljač']}**\n📍 *Prikup:* {nalog['Adresa Prikupa']}\n📦 {nalog['Opis robe']}")
                 
-                st_cls = "status-cekanje" if nalog['Status'] == "Na čekanju" else ("status-isprintano" if nalog['Status'] == "Isprintano" else "status-prikupljeno")
+                # Definiranje CSS klase za status
+                st_cls = "status-cekanje" if nalog['Status'] == "Na čekanju" else (
+                    "status-isprintano" if nalog['Status'] == "Isprintano" else (
+                        "status-prikupljeno" if nalog['Status'] == "Prikupljeno" else "status-storno"
+                    )
+                )
                 c4.markdown(f"<span class='{st_cls}'>{nalog['Status']}</span>", unsafe_allow_html=True)
+
+                trenutni_index = statusi_opcije.index(nalog['Status']) if nalog['Status'] in statusi_opcije else 0
 
                 novi_status = c5.selectbox(
                     "Status",
-                    ["Na čekanju", "Isprintano", "Prikupljeno"],
-                    index=["Na čekanju", "Isprintano", "Prikupljeno"].index(nalog['Status']),
+                    statusi_opcije,
+                    index=trenutni_index,
                     key=f"status_{nalog['ID Naloga']}_{i}"
                 )
 
