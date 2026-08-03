@@ -16,15 +16,18 @@ st.set_page_config(page_title="Makromikro - Prikupi & Povrati", layout="wide", p
 
 # === PODACI ZA KONEKCIJU NA SUPABASE BAZU ===
 SUPABASE_URL = "https://mxirprzgxtiwyhrmkyxv.supabase.co"
-SUPABASE_KEY = "sb_publishable_2S7TjxGUgklILren3fJl0g_Gosq01mB"
+SUPABASE_KEY = "sb_publishable_2S7TjxGUgk1ILren3fJ10g_Gosq01mB"
 
 @st.cache_resource
 def init_supabase() -> Client:
-    return create_client(SUPABASE_URL, SUPABASE_KEY)
+    # Očišćeni URL i ključ
+    clean_url = SUPABASE_URL.strip().rstrip('/')
+    clean_key = SUPABASE_KEY.strip()
+    return create_client(clean_url, clean_key)
 
 try:
     supabase = init_supabase()
-except Exception:
+except Exception as e:
     supabase = None
 
 # --- SPREMANJE I UČITAVANJE IZ TRAJNE BAZE ---
