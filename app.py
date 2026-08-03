@@ -122,7 +122,7 @@ def obrisi_sve_dobavljace():
         except Exception as e:
             st.error(f"Greška pri brisanju dobavljača: {e}")
 
-# Inicijalizacija sesije
+# Inicijalizacija sesije i provjera trajne prijave preko URL/Session parametara
 if "baza_naloga" not in st.session_state:
     st.session_state.baza_naloga = ucitaj_naloge()
 
@@ -135,9 +135,14 @@ if "is_logged_in" not in st.session_state:
 if "user_role" not in st.session_state:
     st.session_state.user_role = None
 
-# Privremene memorijske varijable za funkciju "Ponovi prikup"
 if "ponovi_prikup_data" not in st.session_state:
     st.session_state.ponovi_prikup_data = None
+
+# Automatska provjera spremljene uloge u lokalnoj sesiji preglednika (ili Streamlit state-u)
+query_params = st.query_params
+if not st.session_state.is_logged_in and "role" in query_params:
+    st.session_state.is_logged_in = True
+    st.session_state.user_role = query_params["role"]
 
 st.markdown("""
     <style>
@@ -152,26 +157,34 @@ st.markdown("""
 
 st.title("📦 MAKROMIKRO GRUPA — Upravljanje Prikupima i Povratima")
 
-# --- SUSTAV ZA PRIJAVU ---
+# --- SUSTAV ZA PRIJAVU SA "ZAPAMTI ME" ---
 if not st.session_state.is_logged_in:
     st.warning("🔒 Za pristup aplikaciji obavezna je prijava.")
     
     col_l1, col_l2, _ = st.columns([1.5, 1.5, 3])
     with col_l1:
         unesena_lozinka = st.text_input("Unesite pristupnu lozinku:", type="password")
+        zapamti_me = st.checkbox("Zapamti me na ovom uređaju")
+        
         if st.button("Prijavi se", type="primary"):
-            if unesena_lozinka == "admin123":
-                st.session_state.is_logged_in = True
-                st.session_state.user_role = "admin"
-                st.success("Uspješna prijava kao Voditelj/Admin!")
-                st.rerun()
-            elif unesena_lozinka == "komercijalist123":
-                st.session_state.is_logged_in = True
-                st.session_state.user_role = "komercijalist"
-                st.success("Uspješna prijava kao Komercijalist!")
-                st.rerun()
-            else:
-                st.error("Pogrešna lozinka!")
+             odabrana_uloga = None
+             if unesena_lozinka == "admin123":
+                 odabrana_uloga = "admin"
+             elif unesena_lozinka == "komercijalist123":
+                 odabrana_uloga = "komercijalist"
+                 
+             if odabrana_uloga:
+                 st.session_state.is_logged_in = True
+                 st.session_state.user_role = odabrana_uloga
+                 
+                 # Ako je odabrano "Zapamti me", spremamo u URL/Token preglednika
+                 if zapamti_me:
+                     st.query_params["role"] = odabrana_uloga
+                     
+                 st.success(f"Uspješna prijava kao {odabrana_uloga.upper()}!")
+                 st.rerun()
+             else:
+                 st.error("Pogrešna lozinka!")
     st.stop()
 
 # --- GLAVNI DIO APLIKACIJE ---
@@ -181,6 +194,9 @@ if c_top2.button("🔒 Odjava"):
     st.session_state.is_logged_in = False
     st.session_state.user_role = None
     st.session_state.ponovi_prikup_data = None
+    # Brišemo spremljenu ulogu iz preglednika kod odjave
+    if "role" in st.query_params:
+        del st.query_params["role"]
     st.rerun()
 
 def nadji_logo():
@@ -306,7 +322,6 @@ tab1, tab2 = st.tabs(["➕ Unos Novog Naloga", "📋 Pregled, Print & Upravljanj
 with tab1:
     st.subheader("Unos novog naloga")
 
-    # Provjera ako se radi "Ponovi prikup" iz pregleda
     pp_data = st.session_state.ponovi_prikup_data
     if pp_data:
         st.info(f"🔄 Učitani podaci za ponovljeni prikup iz naloga **{pp_data.get('ID Naloga', '')}**")
@@ -316,7 +331,6 @@ with tab1:
 
     c_dob1, c_dob2 = st.columns([1, 1])
     
-    # Pronađi indeks dobavljača ako je učitan preko ponovi prikup
     default_dob_index = 0
     if pp_data and pp_data.get("Dobavljač") in lista_dobavljaca:
         default_dob_index = lista_dobavljaca.index(pp_data.get("Dobavljač"))
@@ -382,7 +396,7 @@ with tab1:
                 spremi_novi_nalog(novi_nalog)
                 st.session_state.baza_naloga = ucitaj_naloge()
                 st.session_state.baza_dobavljaca = ucitaj_dobavljace()
-                st.session_state.ponovi_prikup_data = None # Očisti privremenu memoriju
+                st.session_state.ponovi_prikup_data = None
                 st.success(f"Nalog {id_naloga} uspješno spremljen! Podaci o dobavljaču zapamćeni za ubuduće.")
 
     if pp_data:
@@ -401,26 +415,20 @@ with tab2:
     if not st.session_state.baza_naloga:
         st.info("Trenutno nema unesenih naloga.")
     else:
-        # --- NAPREDNI FILTERI I PRETRAGA ---
         st.markdown("#### 🔍 Pretraga i Filteri")
         f_kol1, f_kol2, f_kol3, f_kol4 = st.columns(4)
 
-        # 1. Univerzalna tražilica
         search_query = f_kol1.text_input("Pretraživanje (pojam):", placeholder="npr. HP, toner, PR-2026...")
 
-        # 2. Filter po datumu
         sve_datume = sorted(list(set([x["Datum Prikupa"] for x in st.session_state.baza_naloga])), reverse=True)
         odabrani_datum = f_kol2.selectbox("Filter po datumu:", ["Svi datumi"] + sve_datume)
 
-        # 3. Filter po komercijalistu
         svi_komercijalisti = sorted(list(set([x["Komercijalist"] for x in st.session_state.baza_naloga])))
         odabrani_komercijalist = f_kol3.selectbox("Filter po komercijalistu:", ["Svi komercijalisti"] + svi_komercijalisti)
 
-        # 4. Filter po dobavljaču
         svi_dobavljaci_lista = sorted(list(set([x["Dobavljač"] for x in st.session_state.baza_naloga])))
         odabrani_dobavljac_filter = f_kol4.selectbox("Filter po dobavljaču:", ["Svi dobavljači"] + svi_dobavljaci_lista)
 
-        # Primjena filtera
         filtrirani = st.session_state.baza_naloga
 
         if odabrani_datum != "Svi datumi":
@@ -450,7 +458,6 @@ with tab2:
 
         st.divider()
 
-        # AKCIJE (Dostupne SAMO za ADMINA)
         if st.session_state.user_role == "admin":
             col_act1, col_act2 = st.columns(2)
             za_print = [x for x in filtrirani if x["Status"] in ["Na čekanju", "Isprintano"]]
@@ -520,14 +527,13 @@ with tab2:
                 if nalog['Vrijeme Obrade'] != "-":
                     c4.caption(f" Obrada: {nalog['Vrijeme Obrade']}")
 
-                # Kolona s akcijama (Promjena statusa / gumbi)
                 with c5:
                     if st.session_state.user_role == "admin":
                         trenutni_index = statusi_opcije.index(nalog['Status']) if nalog['Status'] in statusi_opcije else 0
 
                         novi_status = st.selectbox(
                             "Status",
-                            statusi_opcije,
+                        statusi_opcije,
                             index=trenutni_index,
                             key=f"status_{nalog['ID Naloga']}_{i}"
                         )
@@ -540,10 +546,8 @@ with tab2:
                     else:
                         st.write("🔒 *Samo pregled*")
 
-                    # Dodatni gumbi (PDF za pojedinačni nalog + Ponovi prikup)
                     sub_c1, sub_c2 = st.columns(2)
                     
-                    # Gumb za PDF pojedinačnog naloga
                     single_pdf_bytes = generiraj_pdf_makromikro([nalog]).getvalue()
                     sub_c1.download_button(
                         label="📄 PDF",
@@ -553,7 +557,6 @@ with tab2:
                         key=f"pdf_single_{nalog['ID Naloga']}_{i}"
                     )
 
-                    # Gumb za ponavljanje prikupa (kopiranje podataka u formu za unos)
                     if sub_c2.button("🔄 Ponovi", key=f"ponovi_{nalog['ID Naloga']}_{i}"):
                         st.session_state.ponovi_prikup_data = nalog
                         st.success("Podaci kopirani! Prebacite se na karticu 'Unos Novog Naloga'.")
