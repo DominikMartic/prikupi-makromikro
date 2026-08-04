@@ -6,6 +6,7 @@ import html
 import os
 import qrcode
 from supabase import create_client, Client
+import streamlit.components.v1 as components
 
 # ReportLab za profesionalni PDF izgled
 from reportlab.lib.pagesizes import A4
@@ -142,13 +143,21 @@ if "user_role" not in st.session_state:
 if "ponovi_prikup_data" not in st.session_state:
     st.session_state.ponovi_prikup_data = None
 
+if "scanned_id" not in st.session_state:
+    st.session_state.scanned_id = None
+
 # --- AUTOMATSKA PROVJERA PARAMETARA NA SAMOM VRHU ---
 query_params = st.query_params
 
-# Ako u linku postoji bilo kakav parametar (search ili role), automatski prijavi korisnika
 if len(query_params) > 0:
     st.session_state.is_logged_in = True
     st.session_state.user_role = query_params.get("role", "admin")
+    if "search" in query_params:
+        st.session_state.scanned_id = query_params.get("search")
+
+# Ako je skenirani ID postavljen preko URL-a
+if st.session_state.scanned_id and not query_params.get("search"):
+    st.query_params["search"] = st.session_state.scanned_id
 
 # --- MODERNI AI / SAAS CSS STILOVI ---
 st.markdown("""
@@ -183,7 +192,6 @@ if not st.session_state.is_logged_in:
             st.markdown("### ✨ Makromikro AI Hub")
             st.caption("Pristup transportnim nalozima i WMS logistici")
             
-            # BRZI GUMB ZA MOBITELE / SKLADIŠTE (Bez tipkanja lozinke!)
             if st.button("🚀 Brzi ulaz (Skladište / Vozač / Pregled)", type="primary", use_container_width=True):
                 st.session_state.is_logged_in = True
                 st.session_state.user_role = "admin"
@@ -226,6 +234,7 @@ if st.button("🔒 Odjava iz sustava", use_container_width=False):
     st.session_state.is_logged_in = False
     st.session_state.user_role = None
     st.session_state.ponovi_prikup_data = None
+    st.session_state.scanned_id = None
     if "role" in st.query_params:
         del st.query_params["role"]
     if "search" in st.query_params:
@@ -290,7 +299,6 @@ def generiraj_pdf_makromikro(nalozi_list):
         naslov_tekst = f"ZAHTJEV ZA TRANSPORT — {clean_txt(n['Tip']).upper()} ({id_naloga_txt})"
         p_naslov = Paragraph(naslov_tekst, doc_title)
 
-        # Generiranje linka za QR kod
         try:
             qr_link = f"{APP_URL}/?search={n['ID Naloga']}&role=admin"
             qr_buf = generiraj_qr_sliku(qr_link)
@@ -464,6 +472,64 @@ with tab2:
         st.session_state.baza_dobavljaca = ucitaj_dobavljace()
         st.rerun()
 
+    # === UGRAĐENI QR SKENER KAMEROM ZA VOZAČE I SKLADIŠTE ===
+    with st.container(border=True):
+        st.markdown("##### 📷 Skeniraj QR kod s papirnatog naloga kamerom mobitela")
+        
+        # HTML + JS QR Scanner preko Html5Qrcode biblioteke
+        qr_scanner_code = """
+        <div style="text-align: center;">
+            <button id="start-scanner" style="background-color: #0284c7; color: white; padding: 10px 20px; font-size: 16px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">📷 Pokreni kameru za skeniranje</button>
+            <button id="stop-scanner" style="background-color: #dc2626; color: white; padding: 10px 20px; font-size: 16px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; display: none; margin-left: 10px;">🛑 Zaustavi kameru</button>
+            <div id="reader" style="width: 100%; max-width: 400px; margin: 15px auto;"></div>
+        </div>
+
+        <script src="https://unpkg.com/html5-qrcode"></script>
+        <script>
+            const startBtn = document.getElementById('start-scanner');
+            const stopBtn = document.getElementById('stop-scanner');
+            let html5QrCode = null;
+
+            startBtn.addEventListener('click', () => {
+                startBtn.style.display = 'none';
+                stopBtn.style.display = 'inline-block';
+                
+                html5QrCode = new Html5Qrcode("reader");
+                const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+                
+                html5QrCode.start(
+                    { facingMode: "environment" }, 
+                    config, 
+                    (decodedText, decodedResult) => {
+                        // Kada skenira QR kod, preusmjeri na URL sa skeniranim kodom
+                        html5QrCode.stop().then(() => {
+                            window.location.href = decodedText;
+                        }).catch(err => {
+                            window.location.href = decodedText;
+                        });
+                    },
+                    (errorMessage) => {
+                        // Greške skeniranja u hodu ignoriramo
+                    }
+                ).catch(err => {
+                    alert("Greška pri pokretanju kamere: " + err);
+                    startBtn.style.display = 'inline-block';
+                    stopBtn.style.display = 'none';
+                });
+            });
+
+            stopBtn.addEventListener('click', () => {
+                if (html5QrCode) {
+                    html5QrCode.stop().then(() => {
+                        startBtn.style.display = 'inline-block';
+                        stopBtn.style.display = 'none';
+                    });
+                }
+            });
+        </script>
+        """
+        components.html(qr_scanner_code, height=320)
+
     if not st.session_state.baza_naloga:
         st.info("Trenutno nema unesenih naloga u bazi.")
     else:
@@ -471,8 +537,7 @@ with tab2:
             st.markdown("##### 🔍 Pretraga i Filteri")
             f_kol1, f_kol2, f_kol3, f_kol4 = st.columns(4)
 
-            # Automatsko povlačenje pojma pretrage ako je korisnik došao preko QR linka
-            default_search = query_params.get("search", "")
+            default_search = st.session_state.scanned_id or query_params.get("search", "")
             search_query = f_kol1.text_input("Pojam pretrage:", value=default_search, placeholder="HP, toner, ID...")
 
             sve_datume = sorted(list(set([x["Datum Prikupa"] for x in st.session_state.baza_naloga])), reverse=True)
@@ -558,7 +623,7 @@ with tab2:
                         st.session_state.baza_naloga = ucitaj_naloge()
                         st.success("Nalozi obrisani!")
                         st.rerun()
-                if c_brisi2.button("🗑️ Obrisi SVE dobavljace"):
+                if c_brisi2.button("🗑️ Obrisi SVELI dobavljace"):
                     if st.checkbox("Potvrdi brisanje dobavljaca", key="p_dob"):
                         obrisi_sve_dobavljace()
                         st.session_state.baza_dobavljaca = ucitaj_dobavljace()
