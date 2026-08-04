@@ -485,7 +485,8 @@ with tab2:
         m5.metric("❌ Storno", broj_storno)
         st.markdown("---")
 
-        za_print = [x for x in filtrirani if x["Status"] in ["Na čekanju", "Isprintano"]]
+        # Zbirni print dohvaća samo one koji su "Na čekanju"
+        za_print = [x for x in filtrirani if x["Status"] == "Na čekanju"]
         if za_print:
             pdf_bytes = generiraj_pdf_makromikro(za_print).getvalue()
             
@@ -500,8 +501,7 @@ with tab2:
             
             if download_clicked:
                 for nalog_za_azuriranje in za_print:
-                    if nalog_za_azuriranje["Status"] == "Na čekanju":
-                        azuriraj_status_naloga(nalog_za_azuriranje["ID Naloga"], "Isprintano", "-")
+                    azuriraj_status_naloga(nalog_za_azuriranje["ID Naloga"], "Isprintano", "-")
                 st.session_state.baza_naloga = ucitaj_naloge()
                 st.rerun()
 
