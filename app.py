@@ -233,7 +233,7 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# Gornji desni kut: Gumb za kameru/skener i gumb za odjavu jedan pored drugog
+# Gornji desni kut: Gumb za kameru i gumb za odjavu jedan pored drugog
 col_top_btn1, col_top_btn2 = st.columns([5, 1.4])
 
 with col_top_btn2:
@@ -261,6 +261,7 @@ if st.session_state.show_scanner_modal:
         st.markdown("##### 📷 Skeniraj QR kod s papirnatog naloga kamerom mobitela")
         st.caption("Usmjerite kameru uređaja na QR kod kako bi aplikacija automatski pronašla nalog.")
         
+        # Korištenje window.top.location.href za uspješno preusmjeravanje glavnog prozora iz iframe-a
         qr_scanner_code = """
         <div style="text-align: center;">
             <button id="start-scanner" style="background-color: #0284c7; color: white; padding: 10px 20px; font-size: 16px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">▶️ Pokreni kameru</button>
@@ -286,9 +287,9 @@ if st.session_state.show_scanner_modal:
                     config, 
                     (decodedText, decodedResult) => {
                         html5QrCode.stop().then(() => {
-                            window.location.href = decodedText;
+                            window.top.location.href = decodedText;
                         }).catch(err => {
-                            window.location.href = decodedText;
+                            window.top.location.href = decodedText;
                         });
                     },
                     (errorMessage) => {}
