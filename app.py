@@ -6,7 +6,6 @@ import html
 import os
 import qrcode
 from supabase import create_client, Client
-import streamlit.components.v1 as components
 
 # ReportLab za profesionalni PDF izgled
 from reportlab.lib.pagesizes import A4
@@ -14,13 +13,20 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
 
+# Pokušaj uvoz biblioteke za čitanje QR koda s fotografije
+try:
+    from PIL import Image as PilImage
+    from pyzbar.pyzbar import decode as decode_qr
+    PYZBAR_AVAILABLE = True
+except ImportError:
+    PYZBAR_AVAILABLE = False
+
 st.set_page_config(page_title="Makromikro - AI Operations Hub", layout="wide", page_icon="📦")
 
 # === PODACI ZA KONEKCIJU I WEB ADRESU ===
 SUPABASE_URL = "https://mxirprzgxtiwyhrmkyxv.supabase.co".strip()
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14aXJwcnpneHRpd3locm1reXh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3ODQ4ODAsImV4cCI6MjEwMTM2MDg4MH0.6RSbGJ3T89rUY_tFBnv5QvQspNY_7FakipZWvdiEbpg".strip()
 
-# Točna web adresa tvoje Streamlit aplikacije
 APP_URL = "https://prikupi-makromikro.streamlit.app" 
 
 def init_supabase() -> Client:
@@ -158,7 +164,6 @@ if len(query_params) > 0:
     if "search" in query_params:
         st.session_state.scanned_id = query_params.get("search")
 
-# Ako je skenirani ID postavljen preko URL-a
 if st.session_state.scanned_id and not query_params.get("search"):
     st.query_params["search"] = st.session_state.scanned_id
 
@@ -233,13 +238,13 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# Gornji desni kut: Gumb za kameru i gumb za odjavu jedan pored drugog
+# Gornji desni kut: Gumb za kameru i gumb za odjavu
 col_top_btn1, col_top_btn2 = st.columns([5, 1.4])
 
 with col_top_btn2:
     sub_c_cam, sub_c_out = st.columns(2)
     with sub_c_cam:
-        if st.button("📷", help="Otvori kameru za skeniranje QR koda naloga", use_container_width=True):
+        if st.button("📷", help="Slikaj i skeniraj QR kod naloga", use_container_width=True):
             st.session_state.show_scanner_modal = not st.session_state.show_scanner_modal
             st.rerun()
     with sub_c_out:
@@ -255,63 +260,39 @@ with col_top_btn2:
                 del st.query_params["search"]
             st.rerun()
 
-# --- MODAL / EKRAN ZA SKENIRANJE QR KODA (KAD JE AKTIVAN) ---
+# --- NATIVNI FOTOAPARAT / SKENER ZA QR KOD ---
 if st.session_state.show_scanner_modal:
     with st.container(border=True):
-        st.markdown("##### 📷 Skeniraj QR kod s papirnatog naloga kamerom mobitela")
-        st.caption("Usmjerite kameru uređaja na QR kod kako bi aplikacija automatski pronašla nalog.")
+        st.markdown("##### 📷 Skeniranje QR koda kamerom mobitela")
+        st.caption("Kliknite u nastavku za slikanje QR koda s papira. Aplikacija će ga automatski prepoznati i otvoriti nalog.")
         
-        # Korištenje window.top.location.href za uspješno preusmjeravanje glavnog prozora iz iframe-a
-        qr_scanner_code = """
-        <div style="text-align: center;">
-            <button id="start-scanner" style="background-color: #0284c7; color: white; padding: 10px 20px; font-size: 16px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">▶️ Pokreni kameru</button>
-            <button id="stop-scanner" style="background-color: #dc2626; color: white; padding: 10px 20px; font-size: 16px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; display: none; margin-left: 10px;">⏹️ Zaustavi</button>
-            <div id="reader" style="width: 100%; max-width: 360px; margin: 15px auto;"></div>
-        </div>
-
-        <script src="https://unpkg.com/html5-qrcode"></script>
-        <script>
-            const startBtn = document.getElementById('start-scanner');
-            const stopBtn = document.getElementById('stop-scanner');
-            let html5QrCode = null;
-
-            startBtn.addEventListener('click', () => {
-                startBtn.style.display = 'none';
-                stopBtn.style.display = 'inline-block';
-                
-                html5QrCode = new Html5Qrcode("reader");
-                const config = { fps: 10, qrbox: { width: 220, height: 220 } };
-                
-                html5QrCode.start(
-                    { facingMode: "environment" }, 
-                    config, 
-                    (decodedText, decodedResult) => {
-                        html5QrCode.stop().then(() => {
-                            window.top.location.href = decodedText;
-                        }).catch(err => {
-                            window.top.location.href = decodedText;
-                        });
-                    },
-                    (errorMessage) => {}
-                ).catch(err => {
-                    alert("Greška pri pokretanju kamere: " + err);
-                    startBtn.style.display = 'inline-block';
-                    stopBtn.style.display = 'none';
-                });
-            });
-
-            stopBtn.addEventListener('click', () => {
-                if (html5QrCode) {
-                    html5QrCode.stop().then(() => {
-                        startBtn.style.display = 'inline-block';
-                        stopBtn.style.display = 'none';
-                    });
-                }
-            });
-        </script>
-        """
-        components.html(qr_scanner_code, height=300)
+        slika_qr = st.camera_input("Usmjerite kameru na QR kod i slikajte")
         
+        if slika_qr is not None:
+            if PYZBAR_AVAILABLE:
+                try:
+                    img = PilImage.open(slika_qr)
+                    decoded_objects = decode_qr(img)
+                    if decoded_objects:
+                        url_tekst = decoded_objects[0].data.decode('utf-8')
+                        st.success(uspjeh := f"Uspješno očitano! Preusmjeravam...")
+                        # Izvlačenje search parametra iz URL-a ako postoji
+                        if "search=" in url_tekst:
+                            s_id = url_tekst.split("search=")[1].split("&")[0]
+                            st.session_state.scanned_id = s_id
+                            st.query_params["search"] = s_id
+                            st.session_state.show_scanner_modal = False
+                            st.rerun()
+                        else:
+                            st.warning(f"Očitani sadržaj: {url_tekst}")
+                    else:
+                        st.error("QR kod nije pronađen na slici. Pokušajte ponovno fokusirati i slikati bliže.")
+                except Exception as e:
+                    st.error(f"Greška pri dekodiranju: {e}")
+            else:
+                # Fallback ako pyzbar nije instaliran na serveru, ali korisnik može ručno upisati ili se link prepozna
+                st.info("Slika zaprimljena. Molimo unesite ID naloga u tražilicu ispod ako se automatski ne prepozna.")
+
         if st.button("❌ Zatvori skener", use_container_width=True):
             st.session_state.show_scanner_modal = False
             st.rerun()
