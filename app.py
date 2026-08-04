@@ -13,13 +13,14 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
 
-# Pokušaj uvoz biblioteke za čitanje QR koda s fotografije
+# Podrška za live QR skeniranje preko webrtc
 try:
-    from PIL import Image as PilImage
+    from streamlit_webrtc import webrtc_streamer, WebRtcMode
+    import av
     from pyzbar.pyzbar import decode as decode_qr
-    PYZBAR_AVAILABLE = True
+    WEBRTC_AVAILABLE = True
 except ImportError:
-    PYZBAR_AVAILABLE = False
+    WEBRTC_AVAILABLE = False
 
 st.set_page_config(page_title="Makromikro - AI Operations Hub", layout="wide", page_icon="📦")
 
@@ -120,13 +121,6 @@ def azuriraj_status_naloga(id_naloga, novi_status, vrijeme_obrade="-"):
         except Exception as e:
             st.error(f"Greska pri azuriranju: {e}")
 
-def obrisi_sve_naloge():
-    if supabase:
-        try:
-            supabase.table("nalozi").delete().neq("id", "NEPOSTOJECI_ID").execute()
-        except Exception as e:
-            st.error(f"Greska pri brisanju: {e}")
-
 # Inicijalizacija sesije
 if "baza_naloga" not in st.session_state:
     st.session_state.baza_naloga = ucitaj_naloge()
@@ -160,10 +154,6 @@ if len(query_params) > 0:
 st.markdown("""
     <style>
     .block-container { padding-top: 2rem; padding-bottom: 3rem; }
-    .ai-badge-cekanje { background: rgba(245, 158, 11, 0.1); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.2); padding: 4px 10px; border-radius: 20px; font-weight: 600; font-size: 0.75rem; }
-    .ai-badge-isprintano { background: rgba(14, 165, 233, 0.1); color: #0284c7; border: 1px solid rgba(14, 165, 233, 0.2); padding: 4px 10px; border-radius: 20px; font-weight: 600; font-size: 0.75rem; }
-    .ai-badge-prikupljeno { background: rgba(34, 197, 94, 0.1); color: #16a34a; border: 1px solid rgba(34, 197, 94, 0.2); padding: 4px 10px; border-radius: 20px; font-weight: 600; font-size: 0.75rem; }
-    .ai-badge-storno { background: rgba(239, 68, 68, 0.1); color: #dc2626; border: 1px solid rgba(239, 68, 68, 0.2); padding: 4px 10px; border-radius: 20px; font-weight: 600; font-size: 0.75rem; text-decoration: line-through; }
     .ai-header-box { display: flex; align-items: center; justify-content: space-between; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 16px 24px; border-radius: 12px; color: white; margin-bottom: 20px; }
     </style>
 """, unsafe_allow_html=True)
@@ -211,7 +201,7 @@ col_top_btn1, col_top_btn2 = st.columns([5, 1.4])
 with col_top_btn2:
     sub_c_cam, sub_c_out = st.columns(2)
     with sub_c_cam:
-        if st.button("📷", help="Slikaj QR kod", use_container_width=True):
+        if st.button("📷", help="Live QR Skener", use_container_width=True):
             st.session_state.show_scanner_modal = not st.session_state.show_scanner_modal
             st.rerun()
     with sub_c_out:
@@ -220,24 +210,35 @@ with col_top_btn2:
             st.session_state.user_role = None
             st.rerun()
 
+# --- LIVE QR SKENER PROZOR ---
 if st.session_state.show_scanner_modal:
     with st.container(border=True):
-        st.markdown("##### 📷 Slikanje QR koda kamerom")
-        slika_qr = st.camera_input("Usmjerite kameru na kod")
-        if slika_qr is not None and PYZBAR_AVAILABLE:
-            try:
-                img = PilImage.open(slika_qr)
-                decoded_objects = decode_qr(img)
-                if decoded_objects:
-                    url_tekst = decoded_objects[0].data.decode('utf-8')
-                    if "search=" in url_tekst:
-                        s_id = url_tekst.split("search=")[1].split("&")[0]
-                        st.session_state.scanned_id = s_id
-                        st.query_params["search"] = s_id
-                        st.session_state.show_scanner_modal = False
-                        st.rerun()
-            except Exception:
-                pass
+        st.markdown("##### 📷 Automatski QR Skener (Uživo)")
+        st.caption("Usmjerite kameru direktno u QR kod na papiru. Kada ga prepozna, aplikacija će ga automatski učitati.")
+        
+        if WEBRTC_AVAILABLE:
+            class QRVideoTransformer:
+                def recv(self, frame: av.VideoFrame) -> av.VideoFrame:
+                    img = frame.to_ndarray(format="bgr24")
+                    decoded = decode_qr(img)
+                    for d in decoded:
+                        data_str = d.data.decode("utf-8")
+                        if "search=" in data_str:
+                            s_id = data_str.split("search=")[1].split("&")[0]
+                            st.session_state.scanned_id = s_id
+                            st.query_params["search"] = s_id
+                    return frame
+
+            webrtc_streamer(
+                key="qr-scanner",
+                mode=WebRtcMode.SENDRECV,
+                video_transformer_factory=QRVideoTransformer,
+                rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
+                media_stream_constraints={"video": {"facingMode": "environment"}, "audio": False}
+            )
+        else:
+            st.warning("Biblioteka za live video stream (streamlit-webrtc) nije instalirana. Pokrenite: `pip install streamlit-webrtc av pyzbar`.")
+
         if st.button("❌ Zatvori skener", use_container_width=True):
             st.session_state.show_scanner_modal = False
             st.rerun()
