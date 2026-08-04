@@ -488,13 +488,22 @@ with tab2:
         za_print = [x for x in filtrirani if x["Status"] in ["Na čekanju", "Isprintano"]]
         if za_print:
             pdf_bytes = generiraj_pdf_makromikro(za_print).getvalue()
-            st.download_button(
+            
+            # Provjera klika na download gumb i automatska promjena statusa u bazi
+            download_clicked = st.download_button(
                 label=f"📄 Preuzmi PDF Zbirni Zahtjev ({len(za_print)} naloga)",
                 data=pdf_bytes,
                 file_name=f"Zahtjev_za_transport_{datetime.now().strftime('%Y-%m-%d')}.pdf",
                 mime="application/pdf",
                 type="primary"
             )
+            
+            if download_clicked:
+                for nalog_za_azuriranje in za_print:
+                    if nalog_za_azuriranje["Status"] == "Na čekanju":
+                        azuriraj_status_naloga(nalog_za_azuriranje["ID Naloga"], "Isprintano", "-")
+                st.session_state.baza_naloga = ucitaj_naloge()
+                st.rerun()
 
         statusi_opcije = ["Na čekanju", "Isprintano", "Prikupljeno", "Storno"]
         is_admin = (st.session_state.user_role == "admin")
