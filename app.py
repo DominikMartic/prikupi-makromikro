@@ -7,22 +7,13 @@ import os
 import qrcode
 from supabase import create_client, Client
 
-# ReportLab za profesionalni PDF izgled
+# ReportLab za profesionalni PDF izradu
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
 
-# Podrška za live QR skeniranje preko webrtc
-try:
-    from streamlit_webrtc import webrtc_streamer, WebRtcMode
-    import av
-    from pyzbar.pyzbar import decode as decode_qr
-    WEBRTC_AVAILABLE = True
-except ImportError:
-    WEBRTC_AVAILABLE = False
-
-st.set_page_config(page_title="Makromikro - AI Operations Hub", layout="wide", page_icon="📦")
+st.set_page_config(page_title="Makromikro - Mobilni Hub", layout="wide", page_icon="📦")
 
 # === PODACI ZA KONEKCIJU ===
 SUPABASE_URL = "https://mxirprzgxtiwyhrmkyxv.supabase.co".strip()
@@ -140,41 +131,45 @@ if "ponovi_prikup_data" not in st.session_state:
 if "scanned_id" not in st.session_state:
     st.session_state.scanned_id = None
 
-if "show_scanner_modal" not in st.session_state:
-    st.session_state.show_scanner_modal = False
-
+# Hvatanje parametara iz URL-a (kada se skenira QR kod s papira)
 query_params = st.query_params
 if len(query_params) > 0:
     st.session_state.is_logged_in = True
-    st.session_state.user_role = query_params.get("role", "admin")
+    # Ako je skeniran QR kod, automatski ga tretiramo kao vozača / teren
+    st.session_state.user_role = query_params.get("role", "vozac")
     if "search" in query_params:
         st.session_state.scanned_id = query_params.get("search")
 
-# --- CSS STILOVI ---
+# --- CSS STILOVI ZA MOBITEL ---
 st.markdown("""
     <style>
-    .block-container { padding-top: 2rem; padding-bottom: 3rem; }
-    .ai-header-box { display: flex; align-items: center; justify-content: space-between; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 16px 24px; border-radius: 12px; color: white; margin-bottom: 20px; }
+    .block-container { padding-top: 1.5rem; padding-bottom: 3rem; max-width: 900px; }
+    .ai-header-box { display: flex; align-items: center; justify-content: space-between; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 14px 20px; border-radius: 12px; color: white; margin-bottom: 15px; }
     </style>
 """, unsafe_allow_html=True)
 
 # --- PRIJAVA ---
 if not st.session_state.is_logged_in:
-    c_l1, c_l2, c_l3 = st.columns([1, 1.2, 1])
+    c_l1, c_l2, c_l3 = st.columns([0.5, 3, 0.5])
     with c_l2:
         st.markdown("<br><br>", unsafe_allow_html=True)
         with st.container(border=True):
-            st.markdown("### ✨ Makromikro AI Hub")
-            st.caption("Pristup transportnim nalozima i WMS logistici")
+            st.markdown("### ⚡ Makromikro Mobile Hub")
+            st.caption("Brzi pristup za vozače i skladištare")
             
-            if st.button("🚀 Brzi ulaz (Skladište / Vozač / Pregled)", type="primary", use_container_width=True):
+            if st.button("🚀 Ulaz u sustav (Admin / Komercijala)", type="primary", use_container_width=True):
                 st.session_state.is_logged_in = True
                 st.session_state.user_role = "admin"
                 st.rerun()
 
+            if st.button("🚚 Ulaz za Vozače / Teren (Brzi Mod)", use_container_width=True):
+                st.session_state.is_logged_in = True
+                st.session_state.user_role = "vozac"
+                st.rerun()
+
             st.divider()
             unesena_lozinka = st.text_input("Ili unesite lozinku:", type="password")
-            if st.button("Prijava", use_container_width=True):
+            if st.button("Prijava lozinkom", use_container_width=True):
                  if unesena_lozinka in ["admin123", ""]:
                      st.session_state.is_logged_in = True
                      st.session_state.user_role = "admin"
@@ -183,65 +178,24 @@ if not st.session_state.is_logged_in:
                      st.error("Pogrešna lozinka!")
     st.stop()
 
-# --- GLAVNI IZLAZ ---
-role_display = st.session_state.user_role.upper() if st.session_state.user_role else "ADMIN"
+# --- GLAVNI HEADER ---
+role_display = "VOZAČ / TEREN" if st.session_state.user_role == "vozac" else "ADMIN / KOMERCIJALA"
 st.markdown(f"""
     <div class="ai-header-box">
         <div>
-            <h2 style="margin:0; font-size: 1.4rem; font-weight: 700; color: #ffffff;">⚡ Makromikro Operations Hub</h2>
-            <p style="margin:0; font-size: 0.85rem; color: #94a3b8;">Upravljanje prikupima i WMS logistikom</p>
-        </div>
-        <div style="background: rgba(255,255,255,0.1); padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; color: #38bdf8;">
-            Uloga: {role_display}
+            <h3 style="margin:0; font-size: 1.2rem; font-weight: 700; color: #ffffff;">⚡ Makromikro Hub</h3>
+            <p style="margin:0; font-size: 0.75rem; color: #94a3b8;">Režim rada: {role_display}</p>
         </div>
     </div>
 """, unsafe_allow_html=True)
 
-col_top_btn1, col_top_btn2 = st.columns([5, 1.4])
+col_top_btn1, col_top_btn2 = st.columns([4, 1.2])
 with col_top_btn2:
-    sub_c_cam, sub_c_out = st.columns(2)
-    with sub_c_cam:
-        if st.button("📷", help="Live QR Skener", use_container_width=True):
-            st.session_state.show_scanner_modal = not st.session_state.show_scanner_modal
-            st.rerun()
-    with sub_c_out:
-        if st.button("🔒", help="Odjava", use_container_width=True):
-            st.session_state.is_logged_in = False
-            st.session_state.user_role = None
-            st.rerun()
-
-# --- LIVE QR SKENER PROZOR ---
-if st.session_state.show_scanner_modal:
-    with st.container(border=True):
-        st.markdown("##### 📷 Automatski QR Skener (Uživo)")
-        st.caption("Usmjerite kameru direktno u QR kod na papiru. Kada ga prepozna, aplikacija će ga automatski učitati.")
-        
-        if WEBRTC_AVAILABLE:
-            class QRVideoTransformer:
-                def recv(self, frame: av.VideoFrame) -> av.VideoFrame:
-                    img = frame.to_ndarray(format="bgr24")
-                    decoded = decode_qr(img)
-                    for d in decoded:
-                        data_str = d.data.decode("utf-8")
-                        if "search=" in data_str:
-                            s_id = data_str.split("search=")[1].split("&")[0]
-                            st.session_state.scanned_id = s_id
-                            st.query_params["search"] = s_id
-                    return frame
-
-            webrtc_streamer(
-                key="qr-scanner",
-                mode=WebRtcMode.SENDRECV,
-                video_transformer_factory=QRVideoTransformer,
-                rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
-                media_stream_constraints={"video": {"facingMode": "environment"}, "audio": False}
-            )
-        else:
-            st.warning("Biblioteka za live video stream (streamlit-webrtc) nije instalirana. Pokrenite: `pip install streamlit-webrtc av pyzbar`.")
-
-        if st.button("❌ Zatvori skener", use_container_width=True):
-            st.session_state.show_scanner_modal = False
-            st.rerun()
+    if st.button("🔒 Odjava", use_container_width=True):
+        st.session_state.is_logged_in = False
+        st.session_state.user_role = None
+        st.session_state.scanned_id = None
+        st.rerun()
 
 def nadji_logo():
     for f in ["logo.png", "logo.jpg", "logo.jpeg", "LOGO.PNG"]:
@@ -291,7 +245,8 @@ def generiraj_pdf_makromikro(nalozi_list):
         p_naslov = Paragraph(naslov_tekst, doc_title)
         
         try:
-            qr_buf = generiraj_qr_sliku(f"{APP_URL}/?search={n['ID Naloga']}&role=admin")
+            # QR kod otvara aplikaciju direktno s upisanim ID-jem u pretragu
+            qr_buf = generiraj_qr_sliku(f"{APP_URL}/?search={n['ID Naloga']}&role=vozac")
             qr_img = Image(qr_buf, width=45, height=45)
             qr_img.hAlign = 'RIGHT'
         except Exception:
@@ -345,6 +300,48 @@ def generiraj_pdf_makromikro(nalozi_list):
     buffer.seek(0)
     return buffer
 
+# --- VOZAČ / TERENSKI MOD (SAMO PRETRAGA I GUMB PREUZETO) ---
+if st.session_state.user_role == "vozac":
+    st.subheader("🚚 Terenski Mod - Preuzimanje Naloga")
+    st.caption("Skenirajte QR kod s papira kamerom (ili ručno upišite ID naloga u polje ispod):")
+
+    with st.container(border=True):
+        search_query = st.text_input("🔍 Pretraga / ID naloga:", value=st.session_state.scanned_id or "")
+
+    filtrirani = st.session_state.baza_naloga
+    if search_query:
+        sq = search_query.lower().strip()
+        filtrirani = [x for x in filtrirani if sq in x["ID Naloga"].lower() or sq in x["Dobavljac"].lower() or sq in x["Opis robe"].lower()]
+
+    if not search_query:
+        st.info("ℹ️ Skenirajte QR kod s papirnatog naloga ili upišite ID u polje iznad za prikaz naloga.")
+    elif not filtrirani:
+        st.warning("Nema pronađenih naloga za zadani pojam.")
+    else:
+        for i, nalog in enumerate(filtrirani):
+            with st.container(border=True):
+                st.markdown(f"### 📄 {nalog['ID Naloga']} ({nalog['Tip']})")
+                st.markdown(f"🏢 **Dobavljač:** {nalog['Dobavljac']}")
+                st.markdown(f"📍 **Adresa prikupljanja:** {nalog['Adresa Prikupa']}")
+                st.markdown(f"📦 **Opis robe:** {nalog['Opis robe']}")
+                st.markdown(f"📞 **Kontakt:** {nalog['Kontakt']}")
+                st.markdown(f"📌 **Napomena:** {nalog['Napomena']}")
+                
+                status_trenutni = nalog['Status']
+                if status_trenutni == "Prikupljeno":
+                    st.success(f"✅ Status: PREUZETO dana {nalog['Vrijeme Obrade']}")
+                else:
+                    st.info(f"⏳ Trenutni status: {status_trenutni}")
+                    if st.button(f"✅ OZNAČI KAO PREUZETO ({nalog['ID Naloga']})", key=f"btn_prev_{nalog['ID Naloga']}_{i}", type="primary", use_container_width=True):
+                        vrijeme_sada = datetime.now().strftime('%d.%m.%Y. %H:%M')
+                        azuriraj_status_naloga(nalog['ID Naloga'], "Prikupljeno", vrijeme_sada)
+                        st.session_state.baza_naloga = ucitaj_naloge()
+                        st.success("Uspješno označeno kao preuzeto!")
+                        st.rerun()
+
+    st.stop()  # Prekidamo prikaz da vozač ne vidi admin izbornike
+
+# --- ADMIN / KOMERCIJALA MOD (DVIJE KARTICE) ---
 tab1, tab2 = st.tabs(["✨ Unos Novog Naloga", "📊 Pregled & Upravljanje"])
 
 with tab1:
