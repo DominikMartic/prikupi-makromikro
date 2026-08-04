@@ -18,7 +18,7 @@ st.set_page_config(page_title="Makromikro - Mobilni Hub", layout="wide", page_ic
 
 # === PODACI ZA KONEKCIJU ===
 SUPABASE_URL = "https://mxirprzgxtiwyhrmkyxv.supabase.co".strip()
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14aXJwcnpneHRpd3locm1reXh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3ODQ4ODAsImV4cCI6MjEwMTM2MDg4MH0.6RSbGJ3T89rUY_tFBnv5QvQspNY_7FakipZWvdiEbpg".strip()
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14aXJwcnpneHRpd3locm1reXh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3ODQ4ODAsImV4cCI6MjEwMTM2MDg4MH0.6RSbGJ3T89rUY_tFBnv5QvQspNY_7FakipZWvdiEbpg".strip() # Ovdje ubaci svoj anon public kljuc
 
 APP_URL = "https://prikupi-makromikro.streamlit.app" 
 
@@ -424,7 +424,7 @@ with tab1:
 
 with tab2:
     col_h1, col_h2 = st.columns([3, 1])
-    col_h1.subheader("📋 Pregled naloga")
+    col_h1.subheader("📋 Pregled & Upravljanje nalozima")
     if col_h2.button("🔄 Osvježi", use_container_width=True):
         st.session_state.baza_naloga = ucitaj_naloge()
         st.session_state.baza_dobavljaca = ucitaj_dobavljace()
@@ -433,13 +433,54 @@ with tab2:
     if not st.session_state.baza_naloga:
         st.info("Nema unesenih naloga u bazi.")
     else:
+        # --- NAPREDNI FILTERI ---
         with st.container(border=True):
-            search_query = st.text_input("🔍 Pretraga po ID-ju, dobavljaču ili opisu:", value=st.session_state.scanned_id or "")
+            st.markdown("##### 🔎 Filteri pretrage")
+            f_col1, f_col2, f_col3, f_col4 = st.columns(4)
 
+            search_query = f_col1.text_input("Pretraga (ID / opis):", value=st.session_state.scanned_id or "")
+            
+            # Dohvat jedinstvenih komercijalista i dobavljača za filtere
+            svi_komercijalisti = ["Svi"] + sorted(list(set(n["Komercijalist"] for n in st.session_state.baza_naloga if n["Komercijalist"])))
+            odabrani_komercijalist = f_col2.selectbox("Komercijalist:", svi_komercijalisti)
+
+            svi_dobavljaci = ["Svi"] + sorted(list(set(n["Dobavljac"] for n in st.session_state.baza_naloga if n["Dobavljac"])))
+            odabrani_dobavljac = f_col3.selectbox("Dobavljač:", svi_dobavljaci)
+
+            svi_datumi = ["Svi"] + sorted(list(set(n["Datum Prikupa"] for n in st.session_state.baza_naloga if n["Datum Prikupa"])))
+            odabrani_datum = f_col4.selectbox("Datum prikupa:", svi_datumi)
+
+        # Filtriranje naloga
         filtrirani = st.session_state.baza_naloga
+
         if search_query:
             sq = search_query.lower()
             filtrirani = [x for x in filtrirani if sq in x["ID Naloga"].lower() or sq in x["Dobavljac"].lower() or sq in x["Opis robe"].lower()]
+        
+        if odabrani_komercijalist != "Svi":
+            filtrirani = [x for x in filtrirani if x["Komercijalist"] == odabrani_komercijalist]
+
+        if odabrani_dobavljac != "Svi":
+            filtrirani = [x for x in filtrirani if x["Dobavljac"] == odabrani_dobavljac]
+
+        if odabrani_datum != "Svi":
+            filtrirani = [x for x in filtrirani if x["Datum Prikupa"] == odabrani_datum]
+
+        # --- BROJČANA STATISTIKA (METRIKE) ---
+        ukupno_prikaza = len(filtrirani)
+        broj_ceka_ispis = len([x for x in filtrirani if x["Status"] == "Na čekanju"])
+        broj_isprintano = len([x for x in filtrirani if x["Status"] == "Isprintano"])
+        broj_prikupljeno = len([x for x in filtrirani if x["Status"] == "Prikupljeno"])
+        broj_storno = len([x for x in filtrirani if x["Status"] == "Storno"])
+
+        st.markdown("---")
+        m1, m2, m3, m4, m5 = st.columns(5)
+        m1.metric("📊 Prikazano", ukupno_prikaza)
+        m2.metric("⏳ Na čekanju", broj_ceka_ispis)
+        m3.metric("🖨️ Isprintano", broj_isprintano)
+        m4.metric("✅ Prikupljeno", broj_prikupljeno)
+        m5.metric("❌ Storno", broj_storno)
+        st.markdown("---")
 
         za_print = [x for x in filtrirani if x["Status"] in ["Na čekanju", "Isprintano"]]
         if za_print:
@@ -452,21 +493,19 @@ with tab2:
                 type="primary"
             )
 
-        st.divider()
         statusi_opcije = ["Na čekanju", "Isprintano", "Prikupljeno", "Storno"]
         is_admin = (st.session_state.user_role == "admin")
 
         for i, nalog in enumerate(filtrirani):
             with st.container(border=True):
                 c1, c2, c3, c4, c5 = st.columns([1.2, 1.8, 2.5, 1.5, 2.2])
-                c1.markdown(f"**{nalog['ID Naloga']}**")
+                c1.markdown(f"**{nalog['ID Naloga']}**<br>_{nalog['Datum Prikupa']}_", unsafe_allow_html=True)
                 c2.markdown(f"👤 **{nalog['Komercijalist']}**")
                 c3.markdown(f"🏢 **{nalog['Dobavljac']}**<br>_{nalog['Adresa Prikupa']}_", unsafe_allow_html=True)
                 c4.markdown(f"**{nalog['Status']}**")
 
                 with c5:
                     if is_admin:
-                        # Samo ADMIN može mijenjati status ovdje
                         novi_status = st.selectbox("Status", statusi_opcije, index=statusi_opcije.index(nalog['Status']) if nalog['Status'] in statusi_opcije else 0, key=f"st_{nalog['ID Naloga']}_{i}", label_visibility="collapsed")
                         if novi_status != nalog['Status']:
                             vrijeme = f"{datetime.now().strftime('%d.%m.%Y. %H:%M')}" if novi_status == "Prikupljeno" else "-"
@@ -474,7 +513,6 @@ with tab2:
                             st.session_state.baza_naloga = ucitaj_naloge()
                             st.rerun()
                     else:
-                        # KOMERCIJALA samo vidi status, nema selectboxa za promjenu
                         st.caption(f"Vrijeme obrade: {nalog['Vrijeme Obrade']}")
 
                     sub_c1, sub_c2 = st.columns(2)
