@@ -119,11 +119,8 @@ if "baza_naloga" not in st.session_state:
 if "baza_dobavljaca" not in st.session_state:
     st.session_state.baza_dobavljaca = ucitaj_dobavljace()
 
-if "is_logged_in" not in st.session_state:
-    st.session_state.is_logged_in = False
-
 if "user_role" not in st.session_state:
-    st.session_state.user_role = None
+    st.session_state.user_role = "vozac"  # Zadano je uvijek vozač (teren)
 
 if "ponovi_prikup_data" not in st.session_state:
     st.session_state.ponovi_prikup_data = None
@@ -134,8 +131,6 @@ if "scanned_id" not in st.session_state:
 # Hvatanje parametara iz URL-a (kada se skenira QR kod s papira)
 query_params = st.query_params
 if len(query_params) > 0:
-    st.session_state.is_logged_in = True
-    # Ako je skeniran QR kod, automatski ga tretiramo kao vozača / teren
     st.session_state.user_role = query_params.get("role", "vozac")
     if "search" in query_params:
         st.session_state.scanned_id = query_params.get("search")
@@ -148,38 +143,14 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- PRIJAVA ---
-if not st.session_state.is_logged_in:
-    c_l1, c_l2, c_l3 = st.columns([0.5, 3, 0.5])
-    with c_l2:
-        st.markdown("<br><br>", unsafe_allow_html=True)
-        with st.container(border=True):
-            st.markdown("### ⚡ Makromikro Mobile Hub")
-            st.caption("Brzi pristup za vozače i skladištare")
-            
-            if st.button("🚀 Ulaz u sustav (Admin / Komercijala)", type="primary", use_container_width=True):
-                st.session_state.is_logged_in = True
-                st.session_state.user_role = "admin"
-                st.rerun()
-
-            if st.button("🚚 Ulaz za Vozače / Teren (Brzi Mod)", use_container_width=True):
-                st.session_state.is_logged_in = True
-                st.session_state.user_role = "vozac"
-                st.rerun()
-
-            st.divider()
-            unesena_lozinka = st.text_input("Ili unesite lozinku:", type="password")
-            if st.button("Prijava lozinkom", use_container_width=True):
-                 if unesena_lozinka in ["admin123", ""]:
-                     st.session_state.is_logged_in = True
-                     st.session_state.user_role = "admin"
-                     st.rerun()
-                 else:
-                     st.error("Pogrešna lozinka!")
-    st.stop()
-
 # --- GLAVNI HEADER ---
-role_display = "VOZAČ / TEREN" if st.session_state.user_role == "vozac" else "ADMIN / KOMERCIJALA"
+if st.session_state.user_role == "admin":
+    role_display = "ADMINISTRATOR"
+elif st.session_state.user_role == "komercijala":
+    role_display = "KOMERCIJALA"
+else:
+    role_display = "VOZAČ / TEREN"
+
 st.markdown(f"""
     <div class="ai-header-box">
         <div>
@@ -189,13 +160,13 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-col_top_btn1, col_top_btn2 = st.columns([4, 1.2])
-with col_top_btn2:
-    if st.button("🔒 Odjava", use_container_width=True):
-        st.session_state.is_logged_in = False
-        st.session_state.user_role = None
-        st.session_state.scanned_id = None
-        st.rerun()
+if st.session_state.user_role in ["admin", "komercijala"]:
+    col_top_btn1, col_top_btn2 = st.columns([4, 1.2])
+    with col_top_btn2:
+        if st.button("🔒 Odjava na Teren", use_container_width=True):
+            st.session_state.user_role = "vozac"
+            st.session_state.scanned_id = None
+            st.rerun()
 
 def nadji_logo():
     for f in ["logo.png", "logo.jpg", "logo.jpeg", "LOGO.PNG"]:
@@ -245,7 +216,6 @@ def generiraj_pdf_makromikro(nalozi_list):
         p_naslov = Paragraph(naslov_tekst, doc_title)
         
         try:
-            # QR kod otvara aplikaciju direktno s upisanim ID-jem u pretragu
             qr_buf = generiraj_qr_sliku(f"{APP_URL}/?search={n['ID Naloga']}&role=vozac")
             qr_img = Image(qr_buf, width=45, height=45)
             qr_img.hAlign = 'RIGHT'
@@ -300,7 +270,7 @@ def generiraj_pdf_makromikro(nalozi_list):
     buffer.seek(0)
     return buffer
 
-# --- VOZAČ / TERENSKI MOD (SAMO PRETRAGA I GUMB PREUZETO) ---
+# --- VOZAČ / TERENSKI MOD ---
 if st.session_state.user_role == "vozac":
     st.subheader("🚚 Terenski Mod - Preuzimanje Naloga")
     st.caption("Skenirajte QR kod s papira kamerom (ili ručno upišite ID naloga u polje ispod):")
@@ -339,9 +309,33 @@ if st.session_state.user_role == "vozac":
                         st.success("Uspješno označeno kao preuzeto!")
                         st.rerun()
 
-    st.stop()  # Prekidamo prikaz da vozač ne vidi admin izbornike
+    # Skrivena prijava na dnu za Komercijalu i Admina
+    st.markdown("<br><br><br>", unsafe_allow_html=True)
+    with st.container(border=True):
+        st.caption("🔐 Pristup sustavu za ovlaštene osobe")
+        col_p1, col_p2 = st.columns(2)
+        
+        with col_p1:
+            pass_kom = st.text_input("Lozinka - Komercijala:", type="password", key="p_kom")
+            if st.button("Prijava: Komercijala", use_container_width=True):
+                if pass_kom == "komercijala123":
+                    st.session_state.user_role = "komercijala"
+                    st.rerun()
+                else:
+                    st.error("Netočna lozinka!")
 
-# --- ADMIN / KOMERCIJALA MOD (DVIJE KARTICE) ---
+        with col_p2:
+            pass_adm = st.text_input("Lozinka - Admin:", type="password", key="p_adm")
+            if st.button("Prijava: Admin", type="primary", use_container_width=True):
+                if pass_adm == "admin123":
+                    st.session_state.user_role = "admin"
+                    st.rerun()
+                else:
+                    st.error("Netočna lozinka!")
+
+    st.stop()  # Prekidamo daljnji prikaz za vozača
+
+# --- KOMERCIJALA ILI ADMIN MOD ---
 tab1, tab2 = st.tabs(["✨ Unos Novog Naloga", "📊 Pregled & Upravljanje"])
 
 with tab1:
@@ -462,6 +456,7 @@ with tab2:
                 c4.markdown(f"**{nalog['Status']}**")
 
                 with c5:
+                    # Komercijala može samo pregledavati i printati, status mijenja samo admin (ili oboje ako želiš, ovdje je dozvoljeno obojima, ali admin ima vrhovnu kontrolu)
                     novi_status = st.selectbox("Status", statusi_opcije, index=statusi_opcije.index(nalog['Status']) if nalog['Status'] in statusi_opcije else 0, key=f"st_{nalog['ID Naloga']}_{i}", label_visibility="collapsed")
                     if novi_status != nalog['Status']:
                         vrijeme = f"{datetime.now().strftime('%d.%m.%Y. %H:%M')}" if novi_status == "Prikupljeno" else "-"
