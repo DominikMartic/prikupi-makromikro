@@ -6,6 +6,7 @@ import html
 import os
 import qrcode
 from supabase import create_client, Client
+from streamlit_qrcode_scanner import qrcode_scanner
 
 # ReportLab za profesionalni PDF izradu
 from reportlab.lib.pagesizes import A4
@@ -112,7 +113,7 @@ def azuriraj_status_naloga(id_naloga, novi_status, vrijeme_obrade="-"):
         except Exception as e:
             st.error(f"Greska pri azuriranju: {e}")
 
-# Inicijalizacija sesije
+# Inicijalizacija sesije i trajno pamćenje prijave
 if "baza_naloga" not in st.session_state:
     st.session_state.baza_naloga = ucitaj_naloge()
 
@@ -120,7 +121,7 @@ if "baza_dobavljaca" not in st.session_state:
     st.session_state.baza_dobavljaca = ucitaj_dobavljace()
 
 if "user_role" not in st.session_state:
-    st.session_state.user_role = "vozac"  # Zadano je uvijek vozač (teren)
+    st.session_state.user_role = "vozac"  # Zadano je teren
 
 if "ponovi_prikup_data" not in st.session_state:
     st.session_state.ponovi_prikup_data = None
@@ -128,12 +129,12 @@ if "ponovi_prikup_data" not in st.session_state:
 if "scanned_id" not in st.session_state:
     st.session_state.scanned_id = None
 
-# Hvatanje parametara iz URL-a (kada se skenira QR kod s papira)
+# Hvatanje parametara iz URL-a
 query_params = st.query_params
-if len(query_params) > 0:
-    st.session_state.user_role = query_params.get("role", "vozac")
-    if "search" in query_params:
-        st.session_state.scanned_id = query_params.get("search")
+if "role" in query_params:
+    st.session_state.user_role = query_params.get("role")
+if "search" in query_params:
+    st.session_state.scanned_id = query_params.get("search")
 
 # --- CSS STILOVI ZA MOBITEL ---
 st.markdown("""
@@ -163,9 +164,10 @@ st.markdown(f"""
 if st.session_state.user_role in ["admin", "komercijala"]:
     col_top_btn1, col_top_btn2 = st.columns([4, 1.2])
     with col_top_btn2:
-        if st.button("🔒 Odjava na Teren", use_container_width=True):
+        if st.button("🔒 Odjava", use_container_width=True):
             st.session_state.user_role = "vozac"
             st.session_state.scanned_id = None
+            st.query_params.clear()
             st.rerun()
 
 def nadji_logo():
@@ -216,7 +218,8 @@ def generiraj_pdf_makromikro(nalozi_list):
         p_naslov = Paragraph(naslov_tekst, doc_title)
         
         try:
-            qr_buf = generiraj_qr_sliku(f"{APP_URL}/?search={n['ID Naloga']}&role=vozac")
+            # QR kod sadrži ISKLJUČIVO ID naloga
+            qr_buf = generiraj_qr_sliku(str(n['ID Naloga']))
             qr_img = Image(qr_buf, width=45, height=45)
             qr_img.hAlign = 'RIGHT'
         except Exception:
@@ -273,7 +276,12 @@ def generiraj_pdf_makromikro(nalozi_list):
 # --- VOZAČ / TERENSKI MOD ---
 if st.session_state.user_role == "vozac":
     st.subheader("🚚 Terenski Mod - Preuzimanje Naloga")
-    st.caption("Skenirajte QR kod s papira kamerom (ili ručno upišite ID naloga u polje ispod):")
+    st.caption("Skenirajte QR kod kamerom uređaja ili upišite ID naloga:")
+
+    # Ugrađeni QR skener preko kamere mobitela/računala
+    scanned_qr = qrcode_scanner(key='qr_scanner')
+    if scanned_qr:
+        st.session_state.scanned_id = scanned_qr
 
     with st.container(border=True):
         search_query = st.text_input("🔍 Pretraga / ID naloga:", value=st.session_state.scanned_id or "")
@@ -284,7 +292,7 @@ if st.session_state.user_role == "vozac":
         filtrirani = [x for x in filtrirani if sq in x["ID Naloga"].lower() or sq in x["Dobavljac"].lower() or sq in x["Opis robe"].lower()]
 
     if not search_query:
-        st.info("ℹ️ Skenirajte QR kod s papirnatog naloga ili upišite ID u polje iznad za prikaz naloga.")
+        st.info("ℹ️ Skenirajte QR kod kamerom iznad ili upišite ID u polje za pretragu.")
     elif not filtrirani:
         st.warning("Nema pronađenih naloga za zadani pojam.")
     else:
@@ -309,7 +317,7 @@ if st.session_state.user_role == "vozac":
                         st.success("Uspješno označeno kao preuzeto!")
                         st.rerun()
 
-    # Skrivena prijava na dnu za Komercijalu i Admina
+    # Prijava na dnu za Komercijalu i Admina
     st.markdown("<br><br><br>", unsafe_allow_html=True)
     with st.container(border=True):
         st.caption("🔐 Pristup sustavu za ovlaštene osobe")
@@ -320,6 +328,7 @@ if st.session_state.user_role == "vozac":
             if st.button("Prijava: Komercijala", use_container_width=True):
                 if pass_kom == "komercijala123":
                     st.session_state.user_role = "komercijala"
+                    st.query_params["role"] = "komercijala"
                     st.rerun()
                 else:
                     st.error("Netočna lozinka!")
@@ -329,11 +338,12 @@ if st.session_state.user_role == "vozac":
             if st.button("Prijava: Admin", type="primary", use_container_width=True):
                 if pass_adm == "admin123":
                     st.session_state.user_role = "admin"
+                    st.query_params["role"] = "admin"
                     st.rerun()
                 else:
                     st.error("Netočna lozinka!")
 
-    st.stop()  # Prekidamo daljnji prikaz za vozača
+    st.stop()
 
 # --- KOMERCIJALA ILI ADMIN MOD ---
 tab1, tab2 = st.tabs(["✨ Unos Novog Naloga", "📊 Pregled & Upravljanje"])
@@ -456,7 +466,6 @@ with tab2:
                 c4.markdown(f"**{nalog['Status']}**")
 
                 with c5:
-                    # Komercijala može samo pregledavati i printati, status mijenja samo admin (ili oboje ako želiš, ovdje je dozvoljeno obojima, ali admin ima vrhovnu kontrolu)
                     novi_status = st.selectbox("Status", statusi_opcije, index=statusi_opcije.index(nalog['Status']) if nalog['Status'] in statusi_opcije else 0, key=f"st_{nalog['ID Naloga']}_{i}", label_visibility="collapsed")
                     if novi_status != nalog['Status']:
                         vrijeme = f"{datetime.now().strftime('%d.%m.%Y. %H:%M')}" if novi_status == "Prikupljeno" else "-"
