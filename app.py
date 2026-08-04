@@ -146,6 +146,9 @@ if "ponovi_prikup_data" not in st.session_state:
 if "scanned_id" not in st.session_state:
     st.session_state.scanned_id = None
 
+if "show_scanner_modal" not in st.session_state:
+    st.session_state.show_scanner_modal = False
+
 # --- AUTOMATSKA PROVJERA PARAMETARA NA SAMOM VRHU ---
 query_params = st.query_params
 
@@ -230,16 +233,88 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-if st.button("🔒 Odjava iz sustava", use_container_width=False):
-    st.session_state.is_logged_in = False
-    st.session_state.user_role = None
-    st.session_state.ponovi_prikup_data = None
-    st.session_state.scanned_id = None
-    if "role" in st.query_params:
-        del st.query_params["role"]
-    if "search" in st.query_params:
-        del st.query_params["search"]
-    st.rerun()
+# Gornji desni kut: Gumb za kameru/skener i gumb za odjavu jedan pored drugog
+col_top_btn1, col_top_btn2 = st.columns([5, 1.4])
+
+with col_top_btn2:
+    sub_c_cam, sub_c_out = st.columns(2)
+    with sub_c_cam:
+        if st.button("📷", help="Otvori kameru za skeniranje QR koda naloga", use_container_width=True):
+            st.session_state.show_scanner_modal = not st.session_state.show_scanner_modal
+            st.rerun()
+    with sub_c_out:
+        if st.button("🔒", help="Odjava iz sustava", use_container_width=True):
+            st.session_state.is_logged_in = False
+            st.session_state.user_role = None
+            st.session_state.ponovi_prikup_data = None
+            st.session_state.scanned_id = None
+            st.session_state.show_scanner_modal = False
+            if "role" in st.query_params:
+                del st.query_params["role"]
+            if "search" in st.query_params:
+                del st.query_params["search"]
+            st.rerun()
+
+# --- MODAL / EKRAN ZA SKENIRANJE QR KODA (KAD JE AKTIVAN) ---
+if st.session_state.show_scanner_modal:
+    with st.container(border=True):
+        st.markdown("##### 📷 Skeniraj QR kod s papirnatog naloga kamerom mobitela")
+        st.caption("Usmjerite kameru uređaja na QR kod kako bi aplikacija automatski pronašla nalog.")
+        
+        qr_scanner_code = """
+        <div style="text-align: center;">
+            <button id="start-scanner" style="background-color: #0284c7; color: white; padding: 10px 20px; font-size: 16px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">▶️ Pokreni kameru</button>
+            <button id="stop-scanner" style="background-color: #dc2626; color: white; padding: 10px 20px; font-size: 16px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; display: none; margin-left: 10px;">⏹️ Zaustavi</button>
+            <div id="reader" style="width: 100%; max-width: 360px; margin: 15px auto;"></div>
+        </div>
+
+        <script src="https://unpkg.com/html5-qrcode"></script>
+        <script>
+            const startBtn = document.getElementById('start-scanner');
+            const stopBtn = document.getElementById('stop-scanner');
+            let html5QrCode = null;
+
+            startBtn.addEventListener('click', () => {
+                startBtn.style.display = 'none';
+                stopBtn.style.display = 'inline-block';
+                
+                html5QrCode = new Html5Qrcode("reader");
+                const config = { fps: 10, qrbox: { width: 220, height: 220 } };
+                
+                html5QrCode.start(
+                    { facingMode: "environment" }, 
+                    config, 
+                    (decodedText, decodedResult) => {
+                        html5QrCode.stop().then(() => {
+                            window.location.href = decodedText;
+                        }).catch(err => {
+                            window.location.href = decodedText;
+                        });
+                    },
+                    (errorMessage) => {}
+                ).catch(err => {
+                    alert("Greška pri pokretanju kamere: " + err);
+                    startBtn.style.display = 'inline-block';
+                    stopBtn.style.display = 'none';
+                });
+            });
+
+            stopBtn.addEventListener('click', () => {
+                if (html5QrCode) {
+                    html5QrCode.stop().then(() => {
+                        startBtn.style.display = 'inline-block';
+                        stopBtn.style.display = 'none';
+                    });
+                }
+            });
+        </script>
+        """
+        components.html(qr_scanner_code, height=300)
+        
+        if st.button("❌ Zatvori skener", use_container_width=True):
+            st.session_state.show_scanner_modal = False
+            st.rerun()
+    st.divider()
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -472,64 +547,6 @@ with tab2:
         st.session_state.baza_dobavljaca = ucitaj_dobavljace()
         st.rerun()
 
-    # === UGRAĐENI QR SKENER KAMEROM ZA VOZAČE I SKLADIŠTE ===
-    with st.container(border=True):
-        st.markdown("##### 📷 Skeniraj QR kod s papirnatog naloga kamerom mobitela")
-        
-        # HTML + JS QR Scanner preko Html5Qrcode biblioteke
-        qr_scanner_code = """
-        <div style="text-align: center;">
-            <button id="start-scanner" style="background-color: #0284c7; color: white; padding: 10px 20px; font-size: 16px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">📷 Pokreni kameru za skeniranje</button>
-            <button id="stop-scanner" style="background-color: #dc2626; color: white; padding: 10px 20px; font-size: 16px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; display: none; margin-left: 10px;">🛑 Zaustavi kameru</button>
-            <div id="reader" style="width: 100%; max-width: 400px; margin: 15px auto;"></div>
-        </div>
-
-        <script src="https://unpkg.com/html5-qrcode"></script>
-        <script>
-            const startBtn = document.getElementById('start-scanner');
-            const stopBtn = document.getElementById('stop-scanner');
-            let html5QrCode = null;
-
-            startBtn.addEventListener('click', () => {
-                startBtn.style.display = 'none';
-                stopBtn.style.display = 'inline-block';
-                
-                html5QrCode = new Html5Qrcode("reader");
-                const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-                
-                html5QrCode.start(
-                    { facingMode: "environment" }, 
-                    config, 
-                    (decodedText, decodedResult) => {
-                        // Kada skenira QR kod, preusmjeri na URL sa skeniranim kodom
-                        html5QrCode.stop().then(() => {
-                            window.location.href = decodedText;
-                        }).catch(err => {
-                            window.location.href = decodedText;
-                        });
-                    },
-                    (errorMessage) => {
-                        // Greške skeniranja u hodu ignoriramo
-                    }
-                ).catch(err => {
-                    alert("Greška pri pokretanju kamere: " + err);
-                    startBtn.style.display = 'inline-block';
-                    stopBtn.style.display = 'none';
-                });
-            });
-
-            stopBtn.addEventListener('click', () => {
-                if (html5QrCode) {
-                    html5QrCode.stop().then(() => {
-                        startBtn.style.display = 'inline-block';
-                        stopBtn.style.display = 'none';
-                    });
-                }
-            });
-        </script>
-        """
-        components.html(qr_scanner_code, height=320)
-
     if not st.session_state.baza_naloga:
         st.info("Trenutno nema unesenih naloga u bazi.")
     else:
@@ -623,7 +640,7 @@ with tab2:
                         st.session_state.baza_naloga = ucitaj_naloge()
                         st.success("Nalozi obrisani!")
                         st.rerun()
-                if c_brisi2.button("🗑️ Obrisi SVELI dobavljace"):
+                if c_brisi2.button("🗑️ Obrisi SVE dobavljace"):
                     if st.checkbox("Potvrdi brisanje dobavljaca", key="p_dob"):
                         obrisi_sve_dobavljace()
                         st.session_state.baza_dobavljaca = ucitaj_dobavljace()
