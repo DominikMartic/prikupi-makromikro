@@ -148,7 +148,7 @@ st.markdown("""
 if st.session_state.user_role == "admin":
     role_display = "ADMINISTRATOR"
 elif st.session_state.user_role == "komercijala":
-    role_display = "KOMERCIJALA"
+    role_display = "KOMERCIJALA (Samo unos i pregled)"
 else:
     role_display = "VOZAČ / TEREN"
 
@@ -218,7 +218,6 @@ def generiraj_pdf_makromikro(nalozi_list):
         p_naslov = Paragraph(naslov_tekst, doc_title)
         
         try:
-            # QR kod sadrži ISKLJUČIVO ID naloga
             qr_buf = generiraj_qr_sliku(str(n['ID Naloga']))
             qr_img = Image(qr_buf, width=45, height=45)
             qr_img.hAlign = 'RIGHT'
@@ -278,7 +277,6 @@ if st.session_state.user_role == "vozac":
     st.subheader("🚚 Terenski Mod - Preuzimanje Naloga")
     st.caption("Skenirajte QR kod kamerom uređaja ili upišite ID naloga:")
 
-    # Ugrađeni QR skener preko kamere mobitela/računala
     scanned_qr = qrcode_scanner(key='qr_scanner')
     if scanned_qr:
         st.session_state.scanned_id = scanned_qr
@@ -456,6 +454,7 @@ with tab2:
 
         st.divider()
         statusi_opcije = ["Na čekanju", "Isprintano", "Prikupljeno", "Storno"]
+        is_admin = (st.session_state.user_role == "admin")
 
         for i, nalog in enumerate(filtrirani):
             with st.container(border=True):
@@ -466,12 +465,17 @@ with tab2:
                 c4.markdown(f"**{nalog['Status']}**")
 
                 with c5:
-                    novi_status = st.selectbox("Status", statusi_opcije, index=statusi_opcije.index(nalog['Status']) if nalog['Status'] in statusi_opcije else 0, key=f"st_{nalog['ID Naloga']}_{i}", label_visibility="collapsed")
-                    if novi_status != nalog['Status']:
-                        vrijeme = f"{datetime.now().strftime('%d.%m.%Y. %H:%M')}" if novi_status == "Prikupljeno" else "-"
-                        azuriraj_status_naloga(nalog['ID Naloga'], novi_status, vrijeme)
-                        st.session_state.baza_naloga = ucitaj_naloge()
-                        st.rerun()
+                    if is_admin:
+                        # Samo ADMIN može mijenjati status ovdje
+                        novi_status = st.selectbox("Status", statusi_opcije, index=statusi_opcije.index(nalog['Status']) if nalog['Status'] in statusi_opcije else 0, key=f"st_{nalog['ID Naloga']}_{i}", label_visibility="collapsed")
+                        if novi_status != nalog['Status']:
+                            vrijeme = f"{datetime.now().strftime('%d.%m.%Y. %H:%M')}" if novi_status == "Prikupljeno" else "-"
+                            azuriraj_status_naloga(nalog['ID Naloga'], novi_status, vrijeme)
+                            st.session_state.baza_naloga = ucitaj_naloge()
+                            st.rerun()
+                    else:
+                        # KOMERCIJALA samo vidi status, nema selectboxa za promjenu
+                        st.caption(f"Vrijeme obrade: {nalog['Vrijeme Obrade']}")
 
                     sub_c1, sub_c2 = st.columns(2)
                     single_pdf = generiraj_pdf_makromikro([nalog]).getvalue()
