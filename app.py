@@ -315,7 +315,7 @@ if st.session_state.user_role == "vozac":
                         st.success("Uspješno označeno kao preuzeto!")
                         st.rerun()
 
-    # Prijava na dnu za Komercijalu i Admina
+    # Prijava na dnu za Komercijalu i Admina s opcijom "Zapamti moju prijavu"
     st.markdown("<br><br><br>", unsafe_allow_html=True)
     with st.container(border=True):
         st.caption("🔐 Pristup sustavu za ovlaštene osobe")
@@ -323,20 +323,24 @@ if st.session_state.user_role == "vozac":
         
         with col_p1:
             pass_kom = st.text_input("Lozinka - Komercijala:", type="password", key="p_kom")
+            zapamti_kom = st.checkbox("Zapamti moju prijavu", key="zap_kom")
             if st.button("Prijava: Komercijala", use_container_width=True):
                 if pass_kom == "komercijala123":
                     st.session_state.user_role = "komercijala"
-                    st.query_params["role"] = "komercijala"
+                    if zapamti_kom:
+                        st.query_params["role"] = "komercijala"
                     st.rerun()
                 else:
                     st.error("Netočna lozinka!")
 
         with col_p2:
             pass_adm = st.text_input("Lozinka - Admin:", type="password", key="p_adm")
+            zapamti_adm = st.checkbox("Zapamti moju prijavu", key="zap_adm")
             if st.button("Prijava: Admin", type="primary", use_container_width=True):
                 if pass_adm == "admin123":
                     st.session_state.user_role = "admin"
-                    st.query_params["role"] = "admin"
+                    if zapamti_adm:
+                        st.query_params["role"] = "admin"
                     st.rerun()
                 else:
                     st.error("Netočna lozinka!")
@@ -440,7 +444,6 @@ with tab2:
 
             search_query = f_col1.text_input("Pretraga (ID / opis):", value=st.session_state.scanned_id or "")
             
-            # Dohvat jedinstvenih komercijalista i dobavljača za filtere
             svi_komercijalisti = ["Svi"] + sorted(list(set(n["Komercijalist"] for n in st.session_state.baza_naloga if n["Komercijalist"])))
             odabrani_komercijalist = f_col2.selectbox("Komercijalist:", svi_komercijalisti)
 
