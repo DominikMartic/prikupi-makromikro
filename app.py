@@ -129,7 +129,7 @@ if "ponovi_prikup_data" not in st.session_state:
 if "scanned_id" not in st.session_state:
     st.session_state.scanned_id = None
 
-# Hvatanje parametara iz URL-a (provjera i kod osvježavanja)
+# Automatsko čitanje URL parametara kod svakog pokretanja/osvježavanja
 query_params = st.query_params
 if "role" in query_params:
     st.session_state.user_role = query_params.get("role")
@@ -323,7 +323,7 @@ if st.session_state.user_role == "vozac":
         
         with col_p1:
             pass_kom = st.text_input("Lozinka - Komercijala:", type="password", key="p_kom")
-            zapamti_kom = st.checkbox("Zapamti moju prijavu", key="zap_kom")
+            zapamti_kom = st.checkbox("Zapamti moju prijavu", key="zap_kom", value=True)
             if st.button("Prijava: Komercijala", use_container_width=True):
                 if pass_kom == "komercijala123":
                     st.session_state.user_role = "komercijala"
@@ -335,7 +335,7 @@ if st.session_state.user_role == "vozac":
 
         with col_p2:
             pass_adm = st.text_input("Lozinka - Admin:", type="password", key="p_adm")
-            zapamti_adm = st.checkbox("Zapamti moju prijavu", key="zap_adm")
+            zapamti_adm = st.checkbox("Zapamti moju prijavu", key="zap_adm", value=True)
             if st.button("Prijava: Admin", type="primary", use_container_width=True):
                 if pass_adm == "admin123":
                     st.session_state.user_role = "admin"
