@@ -113,7 +113,7 @@ def azuriraj_status_naloga(id_naloga, novi_status, vrijeme_obrade="-"):
         except Exception as e:
             st.error(f"Greska pri azuriranju: {e}")
 
-# Inicijalizacija sesije i trajno pamćenje prijave
+# Inicijalizacija sesije
 if "baza_naloga" not in st.session_state:
     st.session_state.baza_naloga = ucitaj_naloge()
 
@@ -129,7 +129,7 @@ if "ponovi_prikup_data" not in st.session_state:
 if "scanned_id" not in st.session_state:
     st.session_state.scanned_id = None
 
-# Hvatanje parametara iz URL-a
+# Hvatanje parametara iz URL-a (provjera i kod osvježavanja)
 query_params = st.query_params
 if "role" in query_params:
     st.session_state.user_role = query_params.get("role")
@@ -485,7 +485,6 @@ with tab2:
         m5.metric("❌ Storno", broj_storno)
         st.markdown("---")
 
-        # Zbirni print dohvaća samo one koji su "Na čekanju"
         za_print = [x for x in filtrirani if x["Status"] == "Na čekanju"]
         if za_print:
             pdf_bytes = generiraj_pdf_makromikro(za_print).getvalue()
