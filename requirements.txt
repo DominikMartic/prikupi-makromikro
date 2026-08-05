@@ -6,3 +6,4 @@ st-gsheets-connection
 supabase
 qrcode[pil]
 streamlit-qrcode-scanner
+openpyxl
