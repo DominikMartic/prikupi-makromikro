@@ -50,7 +50,8 @@ def ucitaj_naloge():
                     "Opis robe": r.get("opis_robe", "-"),
                     "Napomena": r.get("napomena", "-"),
                     "Status": r.get("status", "-"),
-                    "Vrijeme Obrade": r.get("vrijeme_obrade", "-")
+                    "Vrijeme Obrade": r.get("vrijeme_obrade", "-"),
+                    "Datum Kreiranja": r.get("created_at", "-")
                 })
             return nalozi
         except Exception as e:
@@ -297,6 +298,7 @@ if st.session_state.user_role == "vozac":
         for i, nalog in enumerate(filtrirani):
             with st.container(border=True):
                 st.markdown(f"### 📄 {nalog['ID Naloga']} ({nalog['Tip']})")
+                st.markdown(f"🕒 **Kreirano:** {nalog.get('Datum Kreiranja', '-')}")
                 st.markdown(f"🏢 **Dobavljač:** {nalog['Dobavljac']}")
                 st.markdown(f"📍 **Adresa prikupljanja:** {nalog['Adresa Prikupa']}")
                 st.markdown(f"📦 **Opis robe:** {nalog['Opis robe']}")
@@ -440,7 +442,7 @@ with tab2:
         # --- NAPREDNI FILTERI ---
         with st.container(border=True):
             st.markdown("##### 🔎 Filteri pretrage")
-            f_col1, f_col2, f_col3, f_col4 = st.columns(4)
+            f_col1, f_col2, f_col3, f_col4, f_col5 = st.columns(5)
 
             search_query = f_col1.text_input("Pretraga (ID / opis):", value=st.session_state.scanned_id or "")
             
@@ -452,6 +454,9 @@ with tab2:
 
             svi_datumi = ["Svi"] + sorted(list(set(n["Datum Prikupa"] for n in st.session_state.baza_naloga if n["Datum Prikupa"])))
             odabrani_datum = f_col4.selectbox("Datum prikupa:", svi_datumi)
+
+            svi_datumi_kreiranja = ["Svi"] + sorted(list(set(str(n.get("Datum Kreiranja", ""))[:10] for n in st.session_state.baza_naloga if n.get("Datum Kreiranja"))))
+            odabrani_datum_kreiranja = f_col5.selectbox("Datum kreiranja:", svi_datumi_kreiranja)
 
         # Filtriranje naloga
         filtrirani = st.session_state.baza_naloga
@@ -468,6 +473,9 @@ with tab2:
 
         if odabrani_datum != "Svi":
             filtrirani = [x for x in filtrirani if x["Datum Prikupa"] == odabrani_datum]
+
+        if odabrani_datum_kreiranja != "Svi":
+            filtrirani = [x for x in filtrirani if str(x.get("Datum Kreiranja", ""))[:10] == odabrani_datum_kreiranja]
 
         # --- BROJČANA STATISTIKA (METRIKE) ---
         ukupno_prikaza = len(filtrirani)
@@ -510,7 +518,7 @@ with tab2:
         for i, nalog in enumerate(filtrirani):
             with st.container(border=True):
                 c1, c2, c3, c4, c5 = st.columns([1.2, 1.8, 2.5, 1.5, 2.2])
-                c1.markdown(f"**{nalog['ID Naloga']}**<br>_{nalog['Datum Prikupa']}_", unsafe_allow_html=True)
+                c1.markdown(f"**{nalog['ID Naloga']}**<br>Prikup: _{nalog['Datum Prikupa']}_<br><span style='font-size:0.75rem; color:gray;'>Kreirano: {nalog.get('Datum Kreiranja', '-')}</span>", unsafe_allow_html=True)
                 c2.markdown(f"👤 **{nalog['Komercijalist']}**")
                 c3.markdown(f"🏢 **{nalog['Dobavljac']}**<br>_{nalog['Adresa Prikupa']}_", unsafe_allow_html=True)
                 c4.markdown(f"**{nalog['Status']}**")
