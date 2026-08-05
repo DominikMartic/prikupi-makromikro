@@ -4,3 +4,4 @@ supabase
 reportlab
 qrcode
 starlette==0.37.2
+streamlit-qrcode-scanner
