@@ -257,19 +257,42 @@ def generiraj_pdf_makromikro(nalozi_list):
     return buffer
 
 if st.session_state.user_role == "vozac":
-    st.subheader("🚚 Terenski Mod - Preuzimanje Naloga")
-    st.caption("Upišite ID naloga ili naziv dobavljača:")
+    st.subheader("🚚 Terenski Mod - Skeniranje i Preuzimanje Naloga")
+    st.caption("Skener barkoda / QR koda ili ručni unos ID-a:")
 
     with st.container(border=True):
-        search_query = st.text_input("🔍 Pretraga / ID naloga:", value=st.session_state.scanned_id or "")
+        # Ovdje dodajemo podršku za skener (hardverski skeneri se automatski fokusiraju i šalju Enter, ili rucni unos)
+        scanned_input = st.text_input("📷 Skenirajte QR / Barkod ili upišite ID naloga:", value=st.session_state.scanned_id or "", placeholder="Npr. PR-2026-001")
+        
+        col_s1, col_s2 = st.columns(2)
+        
+        # Opcija brzog automatskog preuzimanja ako je unesen točan ID skeniranjem
+        if scanned_input:
+            skid = scanned_input.strip()
+            # Provjeri postoji li nalog s tim ID-jem
+            postojeci_nalog = next((x for x in st.session_state.baza_naloga if x["ID Naloga"].lower() == skid.lower()), None)
+            
+            if postojeci_nalog:
+                st.info( pronađen nalog: **{postojeci_nalog['ID Naloga']}** ({postojeci_nalog['Dobavljac']}) )
+                if postojeci_nalog['Status'] != "Prikupljeno":
+                    if col_s1.button("🚀 Automatski prebaci u PREUZETO", type="primary", use_container_width=True):
+                        vrijeme_sada = datetime.now().strftime('%d.%m.%Y. %H:%M')
+                        azuriraj_status_naloga(postojeci_nalog['ID Naloga'], "Prikupljeno", vrijeme_sada)
+                        st.session_state.baza_naloga = ucitaj_naloge()
+                        st.session_state.scanned_id = ""
+                        st.success(f"Nalog {postojeci_nalog['ID Naloga']} uspješno označen kao preuzet!")
+                        st.rerun()
+                else:
+                    col_s1.warning("Nalog je već označen kao preuzet.")
 
+    search_query = scanned_input
     filtrirani = st.session_state.baza_naloga
     if search_query:
         sq = search_query.lower().strip()
         filtrirani = [x for x in filtrirani if sq in x["ID Naloga"].lower() or sq in x["Dobavljac"].lower() or sq in x["Opis robe"].lower()]
 
     if not search_query:
-        st.info("ℹ️ Upišite ID naloga ili dio naziva dobavljača u polje iznad za pretragu.")
+        st.info("ℹ️ Unesite ili skenirajte barkod/QR kod naloga za brzu akciju.")
     elif not filtrirani:
         st.warning("Nema pronađenih naloga za zadani pojam.")
     else:
