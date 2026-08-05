@@ -6,9 +6,7 @@ import html
 import os
 import qrcode
 from supabase import create_client, Client
-from streamlit_qrcode_scanner import qrcode_scanner
 
-# ReportLab za profesionalni PDF izradu
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -16,21 +14,17 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 
 st.set_page_config(page_title="Makromikro - Mobilni Hub", layout="wide", page_icon="📦")
 
-# === PODACI ZA KONEKCIJU ===
 SUPABASE_URL = "https://mxirprzgxtiwyhrmkyxv.supabase.co".strip()
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14aXJwcnpneHRpd3locm1reXh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3ODQ4ODAsImV4cCI6MjEwMTM2MDg4MH0.6RSbGJ3T89rUY_tFBnv5QvQspNY_7FakipZWvdiEbpg".strip()
-
-APP_URL = "https://prikupi-makromikro.streamlit.app" 
 
 def init_supabase() -> Client:
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
 try:
     supabase = init_supabase()
-except Exception as e:
+except Exception:
     supabase = None
 
-# --- SPREMANJE I UCITAVANJE IZ BAZE ---
 def ucitaj_naloge():
     if supabase:
         try:
@@ -54,8 +48,7 @@ def ucitaj_naloge():
                     "Datum Kreiranja": r.get("created_at", "-")
                 })
             return nalozi
-        except Exception as e:
-            st.error(f"Greška pri čitanju naloga iz baze: {e}")
+        except Exception:
             return []
     return []
 
@@ -63,8 +56,7 @@ def ucitaj_dobavljace():
     if supabase:
         try:
             response = supabase.table("dobavljaci").select("*").order("naziv", desc=False).execute()
-            data = response.data
-            return {d["naziv"]: d for d in data}
+            return {d["naziv"]: d for d in response.data}
         except Exception:
             return {}
     return {}
@@ -79,8 +71,8 @@ def spremi_ili_azuriraj_dobavljaca(naziv, kontakt, adresa, napomena):
                 "napomena": napomena.strip() if napomena else "-"
             }
             supabase.table("dobavljaci").upsert(podaci, on_conflict="naziv").execute()
-        except Exception as e:
-            print(f"Greska dobavljac: {e}")
+        except Exception:
+            pass
 
 def spremi_novi_nalog(n):
     if supabase:
@@ -102,7 +94,7 @@ def spremi_novi_nalog(n):
             supabase.table("nalozi").insert(data).execute()
             spremi_ili_azuriraj_dobavljaca(n["Dobavljac"], n["Kontakt"], n["Adresa Prikupa"], n["Napomena"])
         except Exception as e:
-            st.error(f"Greska pri spremanju u bazu: {e}")
+            st.error(f"Greska pri spremanju: {e}")
 
 def azuriraj_status_naloga(id_naloga, novi_status, vrijeme_obrade="-"):
     if supabase:
@@ -111,10 +103,9 @@ def azuriraj_status_naloga(id_naloga, novi_status, vrijeme_obrade="-"):
                 "status": novi_status,
                 "vrijeme_obrade": vrijeme_obrade
             }).eq("id", id_naloga).execute()
-        except Exception as e:
-            st.error(f"Greska pri azuriranju: {e}")
+        except Exception:
+            pass
 
-# Inicijalizacija sesije
 if "baza_naloga" not in st.session_state:
     st.session_state.baza_naloga = ucitaj_naloge()
 
@@ -143,12 +134,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-if st.session_state.user_role == "admin":
-    role_display = "ADMINISTRATOR"
-elif st.session_state.user_role == "komercijala":
-    role_display = "KOMERCIJALA (Samo unos i pregled)"
-else:
-    role_display = "VOZAČ / TEREN"
+role_display = "ADMINISTRATOR" if st.session_state.user_role == "admin" else ("KOMERCIJALA" if st.session_state.user_role == "komercijala" else "VOZAČ / TEREN")
 
 st.markdown(f"""
     <div class="ai-header-box">
@@ -160,7 +146,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 if st.session_state.user_role in ["admin", "komercijala"]:
-    col_top_btn1, col_top_btn2 = st.columns([4, 1.2])
+    _, col_top_btn2 = st.columns([4, 1.2])
     with col_top_btn2:
         if st.button("🔒 Odjava", use_container_width=True):
             st.session_state.user_role = "vozac"
@@ -270,14 +256,9 @@ def generiraj_pdf_makromikro(nalozi_list):
     buffer.seek(0)
     return buffer
 
-# --- VOZAČ / TERENSKI MOD ---
 if st.session_state.user_role == "vozac":
     st.subheader("🚚 Terenski Mod - Preuzimanje Naloga")
-    st.caption("Skenirajte QR kod kamerom uređaja ili upišite ID naloga:")
-
-    scanned_qr = qrcode_scanner(key='qr_scanner')
-    if scanned_qr:
-        st.session_state.scanned_id = scanned_qr
+    st.caption("Upišite ID naloga ili naziv dobavljača:")
 
     with st.container(border=True):
         search_query = st.text_input("🔍 Pretraga / ID naloga:", value=st.session_state.scanned_id or "")
@@ -288,7 +269,7 @@ if st.session_state.user_role == "vozac":
         filtrirani = [x for x in filtrirani if sq in x["ID Naloga"].lower() or sq in x["Dobavljac"].lower() or sq in x["Opis robe"].lower()]
 
     if not search_query:
-        st.info("ℹ️ Skenirajte QR kod kamerom iznad ili upišite ID u polje za pretragu.")
+        st.info("ℹ️ Upišite ID naloga ili dio naziva dobavljača u polje iznad za pretragu.")
     elif not filtrirani:
         st.warning("Nema pronađenih naloga za zadani pojam.")
     else:
@@ -302,11 +283,10 @@ if st.session_state.user_role == "vozac":
                 st.markdown(f"📞 **Kontakt:** {nalog['Kontakt']}")
                 st.markdown(f"📌 **Napomena:** {nalog['Napomena']}")
                 
-                status_trenutni = nalog['Status']
-                if status_trenutni == "Prikupljeno":
+                if nalog['Status'] == "Prikupljeno":
                     st.success(f"✅ Status: PREUZETO dana {nalog['Vrijeme Obrade']}")
                 else:
-                    st.info(f"⏳ Trenutni status: {status_trenutni}")
+                    st.info(f"⏳ Trenutni status: {nalog['Status']}")
                     if st.button(f"✅ OZNAČI KAO PREUZETO ({nalog['ID Naloga']})", key=f"btn_prev_{nalog['ID Naloga']}_{i}", type="primary", use_container_width=True):
                         vrijeme_sada = datetime.now().strftime('%d.%m.%Y. %H:%M')
                         azuriraj_status_naloga(nalog['ID Naloga'], "Prikupljeno", vrijeme_sada)
@@ -345,7 +325,6 @@ if st.session_state.user_role == "vozac":
 
     st.stop()
 
-# --- KOMERCIJALA ILI ADMIN MOD ---
 tab1, tab2 = st.tabs(["✨ Unos Novog Naloga", "📊 Pregled & Upravljanje"])
 
 with tab1:
@@ -357,7 +336,7 @@ with tab1:
     dobavljaci_dict = st.session_state.baza_dobavljaca
     lista_dobavljaca = ["Novi dobavljac..."] + sorted(list(dobavljaci_dict.keys()))
 
-    c_dob1, c_dob2 = st.columns([1, 1])
+    c_dob1, _ = st.columns([1, 1])
     default_dob_index = 0
     if pp_data and pp_data.get("Dobavljac") in lista_dobavljaca:
         default_dob_index = lista_dobavljaca.index(pp_data.get("Dobavljac"))
@@ -569,7 +548,7 @@ with tab2:
 
                     sub_c1, sub_c2 = st.columns(2)
                     single_pdf = generiraj_pdf_makromikro([nalog]).getvalue()
-                    sub_c1.download_button("📄 PDF", single_pdf, file_name=f"Nalog_{nalog['ID Naloga']}.pdf", mime="application/pdf", key=f>
+                    sub_c1.download_button("📄 PDF", single_pdf, file_name=f"Nalog_{nalog['ID Naloga']}.pdf", mime="application/pdf", key=f"p_{nalog['ID Naloga']}_{i}", use_container_width=True)
                     if sub_c2.button("🔄 Ponovi", key=f"r_{nalog['ID Naloga']}_{i}", use_container_width=True):
                         st.session_state.ponovi_prikup_data = nalog
                         st.rerun()
