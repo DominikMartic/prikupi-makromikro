@@ -6,6 +6,7 @@ import html
 import os
 import qrcode
 from supabase import create_client, Client
+from streamlit_qrcode_scanner import qrcode_scanner
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
@@ -258,15 +259,22 @@ def generiraj_pdf_makromikro(nalozi_list):
 
 if st.session_state.user_role == "vozac":
     st.subheader("🚚 Terenski Mod - Skeniranje i Preuzimanje Naloga")
-    st.caption("Skener barkoda / QR koda ili ručni unos ID-a:")
+    st.caption("Uključite kameru za skeniraje QR koda ili upišite ID ručno:")
 
     with st.container(border=True):
-        scanned_input = st.text_input("📷 Skenirajte QR / Barkod ili upišite ID naloga:", value=st.session_state.scanned_id or "", placeholder="Npr. PR-2026-001")
+        # Otvaranje kamere preko streamlit-qrcode-scanner biblioteke
+        qr_code_skeniran = qrcode_scanner(key="qr_scanner")
+        
+        # Ručni unos kao alternativa
+        rucni_unos = st.text_input("Ili ručno upišite ID naloga:", value=st.session_state.scanned_id or "", placeholder="Npr. PR-2026-001")
+        
+        # Određujemo što se koristi (kamera ima prednost ako je nešto uhvatila)
+        active_input = qr_code_skeniran if qr_code_skeniran else rucni_unos
         
         col_s1, col_s2 = st.columns(2)
         
-        if scanned_input:
-            skid = scanned_input.strip()
+        if active_input:
+            skid = active_input.strip()
             postojeci_nalog = next((x for x in st.session_state.baza_naloga if x["ID Naloga"].lower() == skid.lower()), None)
             
             if postojeci_nalog:
@@ -282,14 +290,14 @@ if st.session_state.user_role == "vozac":
                 else:
                     col_s1.warning("Nalog je već označen kao preuzet.")
 
-    search_query = scanned_input
+    search_query = active_input
     filtrirani = st.session_state.baza_naloga
     if search_query:
         sq = search_query.lower().strip()
         filtrirani = [x for x in filtrirani if sq in x["ID Naloga"].lower() or sq in x["Dobavljac"].lower() or sq in x["Opis robe"].lower()]
 
     if not search_query:
-        st.info("ℹ️ Unesite ili skenirajte barkod/QR kod naloga za brzu akciju.")
+        st.info("ℹ️ Skenirajte QR kod kamerom ili upišite ID naloga za brzu akciju.")
     elif not filtrirani:
         st.warning("Nema pronađenih naloga za zadani pojam.")
     else:
