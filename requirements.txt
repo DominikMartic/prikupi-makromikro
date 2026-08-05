@@ -4,4 +4,3 @@ supabase
 reportlab
 qrcode
 streamlit-qrcode-scanner
-openpyxl
