@@ -1,8 +1,7 @@
 streamlit
 pandas
-reportlab
-Pillow
-st-gsheets-connection
 supabase
-qrcode[pil]
+reportlab
+qrcode
 streamlit-qrcode-scanner
+openpyxl
