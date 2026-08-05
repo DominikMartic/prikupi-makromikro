@@ -18,7 +18,7 @@ st.set_page_config(page_title="Makromikro - Mobilni Hub", layout="wide", page_ic
 
 # === PODACI ZA KONEKCIJU ===
 SUPABASE_URL = "https://mxirprzgxtiwyhrmkyxv.supabase.co".strip()
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14aXJwcnpneHRpd3locm1reXh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3ODQ4ODAsImV4cCI6MjEwMTM2MDg4MH0.6RSbGJ3T89rUY_tFBnv5QvQspNY_7FakipZWvdiEbpg".strip() # Ovdje ubaci svoj anon public kljuc
+SUPABASE_KEY = "ZALIJEPI_TUT_CIJELI_EYJ_ANON_KLJUC".strip()
 
 APP_URL = "https://prikupi-makromikro.streamlit.app" 
 
@@ -122,7 +122,7 @@ if "baza_dobavljaca" not in st.session_state:
     st.session_state.baza_dobavljaca = ucitaj_dobavljace()
 
 if "user_role" not in st.session_state:
-    st.session_state.user_role = "vozac"  # Zadano je teren
+    st.session_state.user_role = "vozac"
 
 if "ponovi_prikup_data" not in st.session_state:
     st.session_state.ponovi_prikup_data = None
@@ -130,14 +130,12 @@ if "ponovi_prikup_data" not in st.session_state:
 if "scanned_id" not in st.session_state:
     st.session_state.scanned_id = None
 
-# Automatsko čitanje URL parametara kod svakog pokretanja/osvježavanja
 query_params = st.query_params
 if "role" in query_params:
     st.session_state.user_role = query_params.get("role")
 if "search" in query_params:
     st.session_state.scanned_id = query_params.get("search")
 
-# --- CSS STILOVI ZA MOBITEL ---
 st.markdown("""
     <style>
     .block-container { padding-top: 1.5rem; padding-bottom: 3rem; max-width: 900px; }
@@ -145,7 +143,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- GLAVNI HEADER ---
 if st.session_state.user_role == "admin":
     role_display = "ADMINISTRATOR"
 elif st.session_state.user_role == "komercijala":
@@ -317,7 +314,6 @@ if st.session_state.user_role == "vozac":
                         st.success("Uspješno označeno kao preuzeto!")
                         st.rerun()
 
-    # Prijava na dnu za Komercijalu i Admina s opcijom "Zapamti moju prijavu"
     st.markdown("<br><br><br>", unsafe_allow_html=True)
     with st.container(border=True):
         st.caption("🔐 Pristup sustavu za ovlaštene osobe")
@@ -439,7 +435,6 @@ with tab2:
     if not st.session_state.baza_naloga:
         st.info("Nema unesenih naloga u bazi.")
     else:
-        # --- NAPREDNI FILTERI ---
         with st.container(border=True):
             st.markdown("##### 🔎 Filteri pretrage")
             f_col1, f_col2, f_col3, f_col4, f_col5 = st.columns(5)
@@ -458,7 +453,6 @@ with tab2:
             svi_datumi_kreiranja = ["Svi"] + sorted(list(set(str(n.get("Datum Kreiranja", ""))[:10] for n in st.session_state.baza_naloga if n.get("Datum Kreiranja"))))
             odabrani_datum_kreiranja = f_col5.selectbox("Datum kreiranja:", svi_datumi_kreiranja)
 
-        # Filtriranje naloga
         filtrirani = st.session_state.baza_naloga
 
         if search_query:
@@ -477,7 +471,6 @@ with tab2:
         if odabrani_datum_kreiranja != "Svi":
             filtrirani = [x for x in filtrirani if str(x.get("Datum Kreiranja", ""))[:10] == odabrani_datum_kreiranja]
 
-        # --- BROJČANA STATISTIKA (METRIKE) ---
         ukupno_prikaza = len(filtrirani)
         broj_ceka_ispis = len([x for x in filtrirani if x["Status"] == "Na čekanju"])
         broj_isprintano = len([x for x in filtrirani if x["Status"] == "Isprintano"])
@@ -493,9 +486,8 @@ with tab2:
         m5.metric("❌ Storno", broj_storno)
         st.markdown("---")
 
-        # --- SEKCIJA ZA ANALITIKU I IZVOZ U EXCEL ---
         with st.container(border=True):
-            st.markdown("##### 📈 Analitika i Izvoz u Excel (Tjedno / Mjesečno / Godišnje)")
+            st.markdown("##### 📈 Analitika i Izvoz podataka (Tjedno / Mjesečno / Godišnje)")
             ex_c1, ex_c2, ex_c3 = st.columns(3)
             
             period_izvoza = ex_c1.selectbox(
@@ -503,36 +495,30 @@ with tab2:
                 ["Svi prikazani nalozi", "Tekući tjedan", "Tekući mjesec", "Tekuća godina"]
             )
 
-            # Filtriranje po odabranom vremenskom periodu za Excel
-            nalozi_za_excel = filtrirani
+            nalozi_za_izvoz = filtrirani
             sadasnji_datum = datetime.now()
 
             if period_izvoza == "Tekući tjedan":
-                # Izračun početka tekućeg tjedna (ponedjeljak)
                 pocetak_tjedna = (sadasnji_datum - pd.Timedelta(days=sadasnji_datum.weekday())).strftime('%Y-%m-%d')
-                nalozi_za_excel = [n for n in filtrirani if str(n.get("Datum Kreiranja", ""))[:10] >= pocetak_tjedna]
+                nalozi_za_izvoz = [n for n in filtrirani if str(n.get("Datum Kreiranja", ""))[:10] >= pocetak_tjedna]
             elif period_izvoza == "Tekući mjesec":
                 trenutni_mjesec = sadasnji_datum.strftime('%Y-%m')
-                nalozi_za_excel = [n for n in filtrirani if str(n.get("Datum Kreiranja", ""))[:7] == trenutni_mjesec]
+                nalozi_za_izvoz = [n for n in filtrirani if str(n.get("Datum Kreiranja", ""))[:7] == trenutni_mjesec]
             elif period_izvoza == "Tekuća godina":
                 trenutna_godina = sadasnji_datum.strftime('%Y')
-                nalozi_za_excel = [n for n in filtrirani if str(n.get("Datum Kreiranja", ""))[:4] == trenutna_godina]
+                nalozi_za_izvoz = [n for n in filtrirani if str(n.get("Datum Kreiranja", ""))[:4] == trenutna_godina]
 
-            ex_c2.markdown(f"<br>Broj naloga za izvoz: **{len(nalozi_za_excel)}**", unsafe_allow_html=True)
+            ex_c2.markdown(f"<br>Broj naloga za izvoz: **{len(nalozi_za_izvoz)}**", unsafe_allow_html=True)
 
-            if nalozi_za_excel:
-                df_export = pd.DataFrame(nalozi_za_excel)
-                # Pretvaranje u Excel bajtove preko pandas-a i io.BytesIO
-                excel_buffer = io.BytesIO()
-                with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-                    df_export.to_excel(writer, index=False, sheet_name='Analitika Naloga')
-                excel_buffer.seek(0)
+            if nalozi_za_izvoz:
+                df_export = pd.DataFrame(nalozi_za_izvoz)
+                csv_data = df_export.to_csv(index=False).encode('utf-8-sig')
 
                 ex_c3.download_button(
-                    label="📥 Preuzmi Excel izvještaj (.xlsx)",
-                    data=excel_buffer,
-                    file_name=f"Makromikro_Analiza_{period_izvoza.lower().replace(' ', '_')}_{datetime.now().strftime('%Y-%m-%d')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    label="📥 Preuzmi Excel/CSV izvještaj",
+                    data=csv_data,
+                    file_name=f"Makromikro_Analiza_{period_izvoza.lower().replace(' ', '_')}_{datetime.now().strftime('%Y-%m-%d')}.csv",
+                    mime="text/csv",
                     type="primary",
                     use_container_width=True
                 )
@@ -583,7 +569,7 @@ with tab2:
 
                     sub_c1, sub_c2 = st.columns(2)
                     single_pdf = generiraj_pdf_makromikro([nalog]).getvalue()
-                    sub_c1.download_button("📄 PDF", single_pdf, file_name=f"Nalog_{nalog['ID Naloga']}.pdf", mime="application/pdf", key=f"p_{nalog['ID Naloga']}_{i}", use_container_width=True)
+                    sub_c1.download_button("📄 PDF", single_pdf, file_name=f"Nalog_{nalog['ID Naloga']}.pdf", mime="application/pdf", key=f>
                     if sub_c2.button("🔄 Ponovi", key=f"r_{nalog['ID Naloga']}_{i}", use_container_width=True):
                         st.session_state.ponovi_prikup_data = nalog
                         st.rerun()
