@@ -3,3 +3,4 @@ pandas
 supabase
 reportlab
 qrcode
+starlette==0.37.2
