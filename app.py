@@ -493,11 +493,58 @@ with tab2:
         m5.metric("❌ Storno", broj_storno)
         st.markdown("---")
 
+        # --- SEKCIJA ZA ANALITIKU I IZVOZ U EXCEL ---
+        with st.container(border=True):
+            st.markdown("##### 📈 Analitika i Izvoz u Excel (Tjedno / Mjesečno / Godišnje)")
+            ex_c1, ex_c2, ex_c3 = st.columns(3)
+            
+            period_izvoza = ex_c1.selectbox(
+                "Odaberi period za analizu:",
+                ["Svi prikazani nalozi", "Tekući tjedan", "Tekući mjesec", "Tekuća godina"]
+            )
+
+            # Filtriranje po odabranom vremenskom periodu za Excel
+            nalozi_za_excel = filtrirani
+            sadasnji_datum = datetime.now()
+
+            if period_izvoza == "Tekući tjedan":
+                # Izračun početka tekućeg tjedna (ponedjeljak)
+                pocetak_tjedna = (sadasnji_datum - pd.Timedelta(days=sadasnji_datum.weekday())).strftime('%Y-%m-%d')
+                nalozi_za_excel = [n for n in filtrirani if str(n.get("Datum Kreiranja", ""))[:10] >= pocetak_tjedna]
+            elif period_izvoza == "Tekući mjesec":
+                trenutni_mjesec = sadasnji_datum.strftime('%Y-%m')
+                nalozi_za_excel = [n for n in filtrirani if str(n.get("Datum Kreiranja", ""))[:7] == trenutni_mjesec]
+            elif period_izvoza == "Tekuća godina":
+                trenutna_godina = sadasnji_datum.strftime('%Y')
+                nalozi_za_excel = [n for n in filtrirani if str(n.get("Datum Kreiranja", ""))[:4] == trenutna_godina]
+
+            ex_c2.markdown(f"<br>Broj naloga za izvoz: **{len(nalozi_za_excel)}**", unsafe_allow_html=True)
+
+            if nalozi_za_excel:
+                df_export = pd.DataFrame(nalozi_za_excel)
+                # Pretvaranje u Excel bajtove preko pandas-a i io.BytesIO
+                excel_buffer = io.BytesIO()
+                with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+                    df_export.to_excel(writer, index=False, sheet_name='Analitika Naloga')
+                excel_buffer.seek(0)
+
+                ex_c3.download_button(
+                    label="📥 Preuzmi Excel izvještaj (.xlsx)",
+                    data=excel_buffer,
+                    file_name=f"Makromikro_Analiza_{period_izvoza.lower().replace(' ', '_')}_{datetime.now().strftime('%Y-%m-%d')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    type="primary",
+                    use_container_width=True
+                )
+            else:
+                ex_c3.warning("Nema naloga za odabrani period.")
+
+        st.markdown("---")
+
         za_print = [x for x in filtrirani if x["Status"] == "Na čekanju"]
         if za_print:
             pdf_bytes = generiraj_pdf_makromikro(za_print).getvalue()
             
-            # Provjera klika na download gumb i automatska promjena statusa u bazi
             download_clicked = st.download_button(
                 label=f"📄 Preuzmi PDF Zbirni Zahtjev ({len(za_print)} naloga)",
                 data=pdf_bytes,
