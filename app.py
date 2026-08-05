@@ -261,19 +261,16 @@ if st.session_state.user_role == "vozac":
     st.caption("Skener barkoda / QR koda ili ručni unos ID-a:")
 
     with st.container(border=True):
-        # Ovdje dodajemo podršku za skener (hardverski skeneri se automatski fokusiraju i šalju Enter, ili rucni unos)
         scanned_input = st.text_input("📷 Skenirajte QR / Barkod ili upišite ID naloga:", value=st.session_state.scanned_id or "", placeholder="Npr. PR-2026-001")
         
         col_s1, col_s2 = st.columns(2)
         
-        # Opcija brzog automatskog preuzimanja ako je unesen točan ID skeniranjem
         if scanned_input:
             skid = scanned_input.strip()
-            # Provjeri postoji li nalog s tim ID-jem
             postojeci_nalog = next((x for x in st.session_state.baza_naloga if x["ID Naloga"].lower() == skid.lower()), None)
             
             if postojeci_nalog:
-                st.info( pronađen nalog: **{postojeci_nalog['ID Naloga']}** ({postojeci_nalog['Dobavljac']}) )
+                st.info(f"Pronađen nalog: **{postojeci_nalog['ID Naloga']}** ({postojeci_nalog['Dobavljac']})")
                 if postojeci_nalog['Status'] != "Prikupljeno":
                     if col_s1.button("🚀 Automatski prebaci u PREUZETO", type="primary", use_container_width=True):
                         vrijeme_sada = datetime.now().strftime('%d.%m.%Y. %H:%M')
