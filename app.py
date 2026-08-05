@@ -18,7 +18,7 @@ st.set_page_config(page_title="Makromikro - Mobilni Hub", layout="wide", page_ic
 
 # === PODACI ZA KONEKCIJU ===
 SUPABASE_URL = "https://mxirprzgxtiwyhrmkyxv.supabase.co".strip()
-SUPABASE_KEY = "ZALIJEPI_TUT_CIJELI_EYJ_ANON_KLJUC".strip()
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14aXJwcnpneHRpd3locm1reXh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3ODQ4ODAsImV4cCI6MjEwMTM2MDg4MH0.6RSbGJ3T89rUY_tFBnv5QvQspNY_7FakipZWvdiEbpg".strip()
 
 APP_URL = "https://prikupi-makromikro.streamlit.app" 
 
