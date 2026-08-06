@@ -15,25 +15,21 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
-# Registracija fonta koji podržava hrvatske znakove (č, ć, ž, š, đ) za PDF
+# Registracija lokalnih fontova za ispravan prikaz hrvatskih znakova (č, ć, ž, š, đ) u PDF-u
 def registriraj_fontove():
-    font_paths = [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/dejavu/DejaVuSans.ttf",
-        "DejaVuSans.ttf"
-    ]
-    for path in font_paths:
-        if os.path.exists(path):
-            try:
-                pdfmetrics.registerFont(TTFont('CustomSans', path))
-                bold_path = path.replace('DejaVuSans.ttf', 'DejaVuSans-Bold.ttf')
-                if os.path.exists(bold_path):
-                    pdfmetrics.registerFont(TTFont('CustomSans-Bold', bold_path))
-                else:
-                    pdfmetrics.registerFont(TTFont('CustomSans-Bold', path))
-                return True
-            except Exception:
-                pass
+    regular_path = "DejaVuSans.ttf"
+    bold_path = "DejaVuSans-Bold.ttf"
+    
+    if os.path.exists(regular_path):
+        try:
+            pdfmetrics.registerFont(TTFont('CustomSans', regular_path))
+            if os.path.exists(bold_path):
+                pdfmetrics.registerFont(TTFont('CustomSans-Bold', bold_path))
+            else:
+                pdfmetrics.registerFont(TTFont('CustomSans-Bold', regular_path))
+            return True
+        except Exception:
+            pass
     return False
 
 font_uspjesno_registriran = registriraj_fontove()
@@ -209,7 +205,6 @@ def generiraj_pdf_makromikro(nalozi_list):
     story = []
     styles = getSampleStyleSheet()
     
-    # Korištenje prilagođenih fontova za ispravan prikaz č, ć, ž, š, đ u PDF-u
     doc_title = ParagraphStyle('DocTitle', parent=styles['Heading1'], fontSize=15, fontName=osnovni_font_bold, textColor=colors.HexColor('#003366'))
     lbl_style = ParagraphStyle('Lbl', parent=styles['Normal'], fontSize=11, fontName=osnovni_font_bold, leading=15)
     val_style = ParagraphStyle('Val', parent=styles['Normal'], fontSize=11, fontName=osnovni_font, leading=15)
