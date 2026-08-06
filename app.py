@@ -456,6 +456,11 @@ with tab2:
             svi_datumi_kreiranja = ["Svi"] + sorted(list(set(str(n.get("Datum Kreiranja", ""))[:10] for n in st.session_state.baza_naloga if n.get("Datum Kreiranja"))))
             odabrani_datum_kreiranja = f_col5.selectbox("Datum kreiranja:", svi_datumi_kreiranja)
 
+            # Dodan filter po statusu
+            st.markdown("")
+            statusi_filter_opcije = ["Svi", "Na čekanju", "Isprintano", "Prikupljeno", "Storno"]
+            odabrani_status_filter = st.selectbox("Filter po statusu:", statusi_filter_opcije)
+
         filtrirani = st.session_state.baza_naloga
 
         if search_query:
@@ -473,6 +478,9 @@ with tab2:
 
         if odabrani_datum_kreiranja != "Svi":
             filtrirani = [x for x in filtrirani if str(x.get("Datum Kreiranja", ""))[:10] == odabrani_datum_kreiranja]
+
+        if odabrani_status_filter != "Svi":
+            filtrirani = [x for x in filtrirani if x["Status"] == odabrani_status_filter]
 
         ukupno_prikaza = len(filtrirani)
         broj_ceka_ispis = len([x for x in filtrirani if x["Status"] == "Na čekanju"])
