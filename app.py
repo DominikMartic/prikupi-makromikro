@@ -262,13 +262,9 @@ if st.session_state.user_role == "vozac":
     st.caption("Uključite kameru za skeniraje QR koda ili upišite ID ručno:")
 
     with st.container(border=True):
-        # Otvaranje kamere preko streamlit-qrcode-scanner biblioteke
         qr_code_skeniran = qrcode_scanner(key="qr_scanner")
-        
-        # Ručni unos kao alternativa
         rucni_unos = st.text_input("Ili ručno upišite ID naloga:", value=st.session_state.scanned_id or "", placeholder="Npr. PR-2026-001")
         
-        # Određujemo što se koristi (kamera ima prednost ako je nešto uhvatila)
         active_input = qr_code_skeniran if qr_code_skeniran else rucni_unos
         
         col_s1, col_s2 = st.columns(2)
@@ -444,7 +440,7 @@ with tab2:
     else:
         with st.container(border=True):
             st.markdown("##### 🔎 Filteri pretrage")
-            f_col1, f_col2, f_col3, f_col4, f_col5 = st.columns(5)
+            f_col1, f_col2, f_col3, f_col4, f_col5, f_col6 = st.columns(6)
 
             search_query = f_col1.text_input("Pretraga (ID / opis):", value=st.session_state.scanned_id or "")
             
@@ -459,6 +455,9 @@ with tab2:
 
             svi_datumi_kreiranja = ["Svi"] + sorted(list(set(str(n.get("Datum Kreiranja", ""))[:10] for n in st.session_state.baza_naloga if n.get("Datum Kreiranja"))))
             odabrani_datum_kreiranja = f_col5.selectbox("Datum kreiranja:", svi_datumi_kreiranja)
+
+            svi_statusi_filter = ["Svi"] + sorted(list(set(n["Status"] for n in st.session_state.baza_naloga if n["Status"])))
+            odabrani_status_filter = f_col6.selectbox("Status:", svi_statusi_filter)
 
         filtrirani = st.session_state.baza_naloga
 
@@ -477,6 +476,9 @@ with tab2:
 
         if odabrani_datum_kreiranja != "Svi":
             filtrirani = [x for x in filtrirani if str(x.get("Datum Kreiranja", ""))[:10] == odabrani_datum_kreiranja]
+
+        if odabrani_status_filter != "Svi":
+            filtrirani = [x for x in filtrirani if x["Status"] == odabrani_status_filter]
 
         ukupno_prikaza = len(filtrirani)
         broj_ceka_ispis = len([x for x in filtrirani if x["Status"] == "Na čekanju"])
@@ -519,13 +521,18 @@ with tab2:
 
             if nalozi_za_izvoz:
                 df_export = pd.DataFrame(nalozi_za_izvoz)
-                csv_data = df_export.to_csv(index=False).encode('utf-8-sig')
+                
+                # Generiranje pravog Excel format (.xlsx)
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                    df_export.to_excel(writer, index=False, sheet_name='Analiza Naloga')
+                excel_data = output.getvalue()
 
                 ex_c3.download_button(
-                    label="📥 Preuzmi Excel/CSV izvještaj",
-                    data=csv_data,
-                    file_name=f"Makromikro_Analiza_{period_izvoza.lower().replace(' ', '_')}_{datetime.now().strftime('%Y-%m-%d')}.csv",
-                    mime="text/csv",
+                    label="📥 Preuzmi Excel izvještaj (.xlsx)",
+                    data=excel_data,
+                    file_name=f"Makromikro_Analiza_{period_izvoza.lower().replace(' ', '_')}_{datetime.now().strftime('%Y-%m-%d')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     type="primary",
                     use_container_width=True
                 )
