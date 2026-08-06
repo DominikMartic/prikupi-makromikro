@@ -515,17 +515,13 @@ with tab2:
 
             if nalozi_za_izvoz:
                 df_export = pd.DataFrame(nalozi_za_izvoz)
-                
-                output = io.BytesIO()
-                with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                    df_export.to_excel(writer, index=False, sheet_name='Analiza Naloga')
-                excel_data = output.getvalue()
+                csv_data = df_export.to_csv(index=False).encode('utf-8')
 
                 ex_c3.download_button(
-                    label="📥 Preuzmi Excel izvještaj (.xlsx)",
-                    data=excel_data,
-                    file_name=f"Makromikro_Analiza_{period_izvoza.lower().replace(' ', '_')}_{datetime.now().strftime('%Y-%m-%d')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    label="📥 Preuzmi CSV izvještaj",
+                    data=csv_data,
+                    file_name=f"Makromikro_Analiza_{period_izvoza.lower().replace(' ', '_')}_{datetime.now().strftime('%Y-%m-%d')}.csv",
+                    mime="text/csv",
                     type="primary",
                     use_container_width=True
                 )
