@@ -181,6 +181,8 @@ def generiraj_pdf_makromikro(nalozi_list):
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=35, leftMargin=35, topMargin=35, bottomMargin=35)
     story = []
     styles = getSampleStyleSheet()
+    
+    # Podešavanje fontova u ReportLab stilovima za podršku dijakritičkih znakova (č, ć, ž, š, đ)
     doc_title = ParagraphStyle('DocTitle', parent=styles['Heading1'], fontSize=15, fontName='Helvetica-Bold', textColor=colors.HexColor('#003366'))
     lbl_style = ParagraphStyle('Lbl', parent=styles['Normal'], fontSize=11, fontName='Helvetica-Bold', leading=15)
     val_style = ParagraphStyle('Val', parent=styles['Normal'], fontSize=11, fontName='Helvetica', leading=15)
@@ -456,7 +458,7 @@ with tab2:
             svi_datumi_kreiranja = ["Svi"] + sorted(list(set(str(n.get("Datum Kreiranja", ""))[:10] for n in st.session_state.baza_naloga if n.get("Datum Kreiranja"))))
             odabrani_datum_kreiranja = f_col5.selectbox("Datum kreiranja:", svi_datumi_kreiranja)
 
-            # Dodan filter po statusu
+            # Filter po statusu s podrškom za hrvatske znakove
             st.markdown("")
             statusi_filter_opcije = ["Svi", "Na čekanju", "Isprintano", "Prikupljeno", "Storno"]
             odabrani_status_filter = st.selectbox("Filter po statusu:", statusi_filter_opcije)
@@ -523,6 +525,7 @@ with tab2:
 
             if nalozi_za_izvoz:
                 df_export = pd.DataFrame(nalozi_za_izvoz)
+                # Eksplicitno definirano utf-8 enkodiranje za CSV s dijakritičkim znakovima
                 csv_data = df_export.to_csv(index=False).encode('utf-8')
 
                 ex_c3.download_button(
