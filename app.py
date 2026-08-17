@@ -459,6 +459,51 @@ with tab2:
         st.session_state.baza_dobavljaca = ucitaj_dobavljace()
         st.rerun()
 
+    # --- DODANO: ADMIN PANEL ZA ČIŠĆENJE DUPLIKATA (Komercijalisti i Dobavljači) ---
+    if st.session_state.user_role == "admin":
+        with st.expander("🛠️ Admin Panel: Čišćenje i brisanje duplih unosa (Komercijalisti / Dobavljači)", expanded=False):
+            st.markdown("Ovdje možete obrisati ili korigirati podatke u bazi ako su se pojavili duplikati (npr. zbog malih/velikih slova).")
+            
+            # 1. Upravljanje komercijalistima
+            st.markdown("#### 👤 Komercijalisti u bazi")
+            svi_kom_baza = sorted(list(set(n["Komercijalist"] for n in st.session_state.baza_naloga if n["Komercijalist"])))
+            
+            col_k1, col_k2 = st.columns([2, 1])
+            kom_za_brisanj_ili_pregled = col_k1.selectbox("Odaberi komercijalista za upravljanje:", svi_kom_baza, key="admin_sel_kom")
+            
+            if col_k2.button("🗑️ Obriši sve naloge ovog komercijalista", type="secondary"):
+                if supabase and kom_za_brisanj_ili_pregled:
+                    try:
+                        # Briše naloge vezane uz tog komercijalista iz baze
+                        supabase.table("nalozi").delete().eq("komercijalist", kom_za_brisanj_ili_pregled).execute()
+                        st.session_state.baza_naloga = ucitaj_naloge()
+                        st.success(f"Uspješno obrisani svi unosi za komercijalista: {kom_za_brisanj_ili_pregled}")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Greška pri brisanju: {e}")
+
+            st.markdown("---")
+
+            # 2. Upravljanje dobavljačima
+            st.markdown("#### 🏢 Dobavljači u bazi")
+            svi_dob_baza = sorted(list(st.session_state.baza_dobavljaca.keys()))
+            
+            col_d1, col_d2 = st.columns([2, 1])
+            dob_za_brisanje = col_d1.selectbox("Odaberi dobavljača za brisanje:", svi_dob_baza, key="admin_sel_dob")
+            
+            if col_d2.button("🗑️ Obriši dobavljača", type="secondary"):
+                if supabase and dob_za_brisanje:
+                    try:
+                        # Briše dobavljača iz tablice dobavljaca
+                        supabase.table("dobavljaci").delete().eq("naziv", dob_za_brisanje).execute()
+                        st.session_state.baza_dobavljaca = ucitaj_dobavljace()
+                        st.success(f"Uspješno obrisan dobavljač: {dob_za_brisanje}")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Greška pri brisanju: {e}")
+        st.markdown("---")
+    # ---------------------------------------------------------------------------
+
     if not st.session_state.baza_naloga:
         st.info("Nema unesenih naloga u bazi.")
     else:
