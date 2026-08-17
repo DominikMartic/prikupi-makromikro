@@ -420,26 +420,9 @@ with tab1:
             tip = c1.selectbox("Tip dokumenta", ["Prikup", "Povrat"])
             datum = c3.date_input("Datum prikupa", datetime.now())
 
-            # Komercijalist polje (odabir iz postojeće baze imena ili ručni unos slobodnog teksta)
-            pp_kom = pp_data.get("Komercijalist", "") if pp_data else ""
-            
-            # Stacemo tekstualni input povezan s popisom ili stvoriti kombinaciju
-            # U Streamlit-u tekstualni input služi za upis, a selectbox za odabir. 
-            # Ako želimo da se može odabrati ili upisati kao dobavljač:
-            opcije_komercijalist = ["Odaberi ili upiši novog..."] + svi_komercijalisti_baza
-            
-            odabrani_kom_izbor = c2.selectbox("Podnositelj zahtjeva (Komercijalist):", opcije_komercijalist)
-            
-            if odabrani_kom_izbor == "Odaberi ili upiši novog...":
-                komercijalist = st.text_input("Upišite ime komercijalista", value=pp_kom)
-            else:
-                komercijalist = odabrani_kom_izbor
-                # Omogućujemo da ako korisnik ipak želi prilagoditi, tekstualno polje nadjača ili stoji ispod
-                # Zapravo, jednostavnija praksa je tekstualni input s opcijom odabira ili zasebno polje za novi unos kao kod dobavljača.
-                # Prilagodit ćemo da bude identično logici dobavljača ukoliko nema na popisu:
-
-            # Vraćamo logiku identičnu dobavljaču:
+            # Komercijalist opcije (Popis iz baze + opcija "Novi komercijalist...")
             lista_komercijalista_opcije = ["Novi komercijalist..."] + svi_komercijalisti_baza
+            pp_kom = pp_data.get("Komercijalist", "") if pp_data else ""
             
             default_kom_index = 0
             if pp_kom and pp_kom in lista_komercijalista_opcije:
@@ -448,7 +431,7 @@ with tab1:
             odabrani_kom_opcija = c2.selectbox("Podnositelj zahtjeva (Komercijalist):", lista_komercijalista_opcije, index=default_kom_index)
             
             if odabrani_kom_opcija == "Novi komercijalist...":
-                komercijalist = st.text_input("Upišite novog komercijalista", value=pp_kom if pp_kom not in lista_komercijalista_opcije else "")
+                komercijalist = st.text_input("Upišite ime novog komercijalista", value=pp_kom if pp_kom not in lista_komercijalista_opcije else "")
             else:
                 komercijalist = odabrani_kom_opcija
 
