@@ -85,6 +85,15 @@ def ucitaj_dobavljace():
             return {}
     return {}
 
+def ucitaj_komercijaliste():
+    if supabase:
+        try:
+            response = supabase.table("komercijalisti").select("*").order("naziv", desc=False).execute()
+            return {k["naziv"]: k for k in response.data}
+        except Exception:
+            return {}
+    return {}
+
 def spremi_ili_azuriraj_dobavljaca(naziv, kontakt, adresa, napomena):
     if supabase and naziv and naziv != "Novi dobavljac...":
         try:
@@ -95,6 +104,14 @@ def spremi_ili_azuriraj_dobavljaca(naziv, kontakt, adresa, napomena):
                 "napomena": napomena.strip() if napomena else "-"
             }
             supabase.table("dobavljaci").upsert(podaci, on_conflict="naziv").execute()
+        except Exception:
+            pass
+
+def spremi_ili_azuriraj_komercijalista(naziv):
+    if supabase and naziv and naziv != "Novi komercijalist...":
+        try:
+            podaci = {"naziv": naziv.strip()}
+            supabase.table("komercijalisti").upsert(podaci, on_conflict="naziv").execute()
         except Exception:
             pass
 
@@ -117,6 +134,7 @@ def spremi_novi_nalog(n):
             }
             supabase.table("nalozi").insert(data).execute()
             spremi_ili_azuriraj_dobavljaca(n["Dobavljac"], n["Kontakt"], n["Adresa Prikupa"], n["Napomena"])
+            spremi_ili_azuriraj_komercijalista(n["Komercijalist"])
         except Exception as e:
             st.error(f"Greska pri spremanju: {e}")
 
@@ -135,6 +153,9 @@ if "baza_naloga" not in st.session_state:
 
 if "baza_dobavljaca" not in st.session_state:
     st.session_state.baza_dobavljaca = ucitaj_dobavljace()
+
+if "baza_komercijalista" not in st.session_state:
+    st.session_state.baza_komercijalista = ucitaj_komercijaliste()
 
 if "user_role" not in st.session_state:
     st.session_state.user_role = "vozac"
@@ -385,34 +406,52 @@ with tab1:
     if pp_data:
         st.info(f"🔄 Učitani podaci za ponovljeni prikup iz naloga **{pp_data.get('ID Naloga', '')}**")
 
+    # Dohvat komercijalista
+    komercijalisti_dict = st.session_state.baza_komercijalista
+    lista_komercijalista = ["Novi komercijalist..."] + sorted(list(komercijalisti_dict.keys()))
+
+    # Dohvat dobavljača
     dobavljaci_dict = st.session_state.baza_dobavljaca
     lista_dobavljaca = ["Novi dobavljac..."] + sorted(list(dobavljaci_dict.keys()))
-
-    c_dob1, _ = st.columns([1, 1])
-    default_dob_index = 0
-    if pp_data and pp_data.get("Dobavljac") in lista_dobavljaca:
-        default_dob_index = lista_dobavljaca.index(pp_data.get("Dobavljac"))
-
-    odabrani_dobavljac_opcija = c_dob1.selectbox("Odaberi dobavljača:", lista_dobavljaca, index=default_dob_index)
-
-    if odabrani_dobavljac_opcija != "Novi dobavljac...":
-        podaci_dob = dobavljaci_dict.get(odabrani_dobavljac_opcija, {})
-        zadati_naziv = odabrani_dobavljac_opcija
-        zadati_kontakt = podaci_dob.get("kontakt", "")
-        zadana_adresa = podaci_dob.get("adresa_prikupa", "")
-        zadana_napomena = podaci_dob.get("napomena", "")
-    else:
-        zadati_naziv = pp_data.get("Dobavljac", "") if pp_data else ""
-        zadati_kontakt = pp_data.get("Kontakt", "") if pp_data else ""
-        zadana_adresa = pp_data.get("Adresa Prikupa", "") if pp_data else ""
-        zadana_napomena = pp_data.get("Napomena", "") if pp_data else ""
 
     with st.container(border=True):
         with st.form("forma_unos", clear_on_submit=True):
             c1, c2, c3 = st.columns(3)
             tip = c1.selectbox("Tip dokumenta", ["Prikup", "Povrat"])
-            komercijalist = c2.text_input("Podnositelj zahtjeva", value=pp_data.get("Komercijalist", "") if pp_data else "")
             datum = c3.date_input("Datum prikupa", datetime.now())
+
+            # Komercijalist opcija (Baza ili unos novog)
+            default_kom_index = 0
+            pp_kom = pp_data.get("Komercijalist", "") if pp_data else ""
+            if pp_kom and pp_kom in lista_komercijalista:
+                default_kom_index = lista_komercijalista.index(pp_kom)
+
+            odabrani_kom_opcija = c2.selectbox("Podnositelj zahtjeva (Komercijalist):", lista_komercijalista, index=default_kom_index)
+            
+            if odabrani_kom_opcija == "Novi komercijalist...":
+                komercijalist = st.text_input("Upišite novog komercijalista", value=pp_kom if pp_kom not in lista_komercijalista else "")
+            else:
+                komercijalist = odabrani_kom_opcija
+
+            # Dobavljač opcija (Baza ili unos novog)
+            default_dob_index = 0
+            pp_dob = pp_data.get("Dobavljac", "") if pp_data else ""
+            if pp_dob and pp_dob in lista_dobavljaca:
+                default_dob_index = lista_dobavljaca.index(pp_dob)
+
+            odabrani_dob_opcija = st.selectbox("Odaberi dobavljača:", lista_dobavljaca, index=default_dob_index)
+
+            if odabrani_dob_opcija != "Novi dobavljac...":
+                podaci_dob = dobavljaci_dict.get(odabrani_dob_opcija, {})
+                zadati_naziv = odabrani_dob_opcija
+                zadati_kontakt = podaci_dob.get("kontakt", "")
+                zadana_adresa = podaci_dob.get("adresa_prikupa", "")
+                zadana_napomena = podaci_dob.get("napomena", "")
+            else:
+                zadati_naziv = pp_dob if pp_dob not in lista_dobavljaca else ""
+                zadati_kontakt = pp_data.get("Kontakt", "") if pp_data else ""
+                zadana_adresa = pp_data.get("Adresa Prikupa", "") if pp_data else ""
+                zadana_napomena = pp_data.get("Napomena", "") if pp_data else ""
 
             c4, c5 = st.columns(2)
             dobavljac = c4.text_input("Dobavljač", value=zadati_naziv)
@@ -452,6 +491,7 @@ with tab1:
                     spremi_novi_nalog(novi_nalog)
                     st.session_state.baza_naloga = ucitaj_naloge()
                     st.session_state.baza_dobavljaca = ucitaj_dobavljace()
+                    st.session_state.baza_komercijalista = ucitaj_komercijaliste()
                     st.session_state.ponovi_prikup_data = None
                     st.success(f"Nalog {id_naloga} uspješno spremljen u bazu!")
 
@@ -461,6 +501,7 @@ with tab2:
     if col_h2.button("🔄 Osvježi", use_container_width=True):
         st.session_state.baza_naloga = ucitaj_naloge()
         st.session_state.baza_dobavljaca = ucitaj_dobavljace()
+        st.session_state.baza_komercijalista = ucitaj_komercijaliste()
         st.rerun()
 
     if not st.session_state.baza_naloga:
@@ -616,22 +657,24 @@ with tab2:
 if st.session_state.user_role == "admin":
     with tab3:
         st.subheader("🧹 Čišćenje i brisanje unosa (Admin Panel)")
-        st.markdown("Ovdje možete slobodno obrisati unose komercijalista (i sve njihove pripadajuće naloge) ili suvišne dobavljače.")
+        st.markdown("Ovdje možete slobodno obrisati unose komercijalista ili suvišne dobavljače.")
         
         with st.container(border=True):
-            st.markdown("#### 👤 Brisanje komercijalista i njegovih naloga")
-            svi_kom_baza = sorted(list(set(n["Komercijalist"] for n in st.session_state.baza_naloga if n["Komercijalist"])))
+            st.markdown("#### 👤 Brisanje komercijalista")
+            svi_kom_baza = sorted(list(st.session_state.baza_komercijalista.keys()))
+            if not svi_kom_baza:
+                svi_kom_baza = sorted(list(set(n["Komercijalist"] for n in st.session_state.baza_naloga if n["Komercijalist"])))
             
             if svi_kom_baza:
                 col_k1, col_k2 = st.columns([2, 1])
                 kom_za_brisanje = col_k1.selectbox("Odaberi komercijalista:", svi_kom_baza, key="open_sel_kom_del")
                 
-                if col_k2.button("🗑️ Obriši komercijalista i naloge", type="secondary", use_container_width=True):
+                if col_k2.button("🗑️ Obriši komercijalista", type="secondary", use_container_width=True):
                     if supabase and kom_za_brisanje:
                         try:
-                            supabase.table("nalozi").delete().eq("komercijalist", kom_za_brisanje).execute()
-                            st.session_state.baza_naloga = ucitaj_naloge()
-                            st.success(f"Uspješno obrisan komercijalist i svi njegovi unosi: {kom_za_brisanje}")
+                            supabase.table("komercijalisti").delete().eq("naziv", kom_za_brisanje).execute()
+                            st.session_state.baza_komercijalista = ucitaj_komercijaliste()
+                            st.success(f"Uspješno obrisan komercijalist: {kom_za_brisanje}")
                             st.rerun()
                         except Exception as e:
                             st.error(f"Greška pri brisanju: {e}")
