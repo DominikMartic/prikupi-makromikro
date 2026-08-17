@@ -85,15 +85,6 @@ def ucitaj_dobavljace():
             return {}
     return {}
 
-def ucitaj_komercijaliste():
-    if supabase:
-        try:
-            response = supabase.table("komercijalisti").select("*").order("naziv", desc=False).execute()
-            return {k["naziv"]: k for k in response.data}
-        except Exception:
-            return {}
-    return {}
-
 def spremi_ili_azuriraj_dobavljaca(naziv, kontakt, adresa, napomena):
     if supabase and naziv and naziv != "Novi dobavljac...":
         try:
@@ -104,14 +95,6 @@ def spremi_ili_azuriraj_dobavljaca(naziv, kontakt, adresa, napomena):
                 "napomena": napomena.strip() if napomena else "-"
             }
             supabase.table("dobavljaci").upsert(podaci, on_conflict="naziv").execute()
-        except Exception:
-            pass
-
-def spremi_ili_azuriraj_komercijalista(naziv):
-    if supabase and naziv:
-        try:
-            podaci = {"naziv": naziv.strip()}
-            supabase.table("komercijalisti").upsert(podaci, on_conflict="naziv").execute()
         except Exception:
             pass
 
@@ -134,7 +117,6 @@ def spremi_novi_nalog(n):
             }
             supabase.table("nalozi").insert(data).execute()
             spremi_ili_azuriraj_dobavljaca(n["Dobavljac"], n["Kontakt"], n["Adresa Prikupa"], n["Napomena"])
-            spremi_ili_azuriraj_komercijalista(n["Komercijalist"])
         except Exception as e:
             st.error(f"Greska pri spremanju: {e}")
 
@@ -153,9 +135,6 @@ if "baza_naloga" not in st.session_state:
 
 if "baza_dobavljaca" not in st.session_state:
     st.session_state.baza_dobavljaca = ucitaj_dobavljace()
-
-if "baza_komercijalista" not in st.session_state:
-    st.session_state.baza_komercijalista = ucitaj_komercijaliste()
 
 if "user_role" not in st.session_state:
     st.session_state.user_role = "vozac"
@@ -473,7 +452,6 @@ with tab1:
                     spremi_novi_nalog(novi_nalog)
                     st.session_state.baza_naloga = ucitaj_naloge()
                     st.session_state.baza_dobavljaca = ucitaj_dobavljace()
-                    st.session_state.baza_komercijalista = ucitaj_komercijaliste()
                     st.session_state.ponovi_prikup_data = None
                     st.success(f"Nalog {id_naloga} uspješno spremljen u bazu!")
 
@@ -483,7 +461,6 @@ with tab2:
     if col_h2.button("🔄 Osvježi", use_container_width=True):
         st.session_state.baza_naloga = ucitaj_naloge()
         st.session_state.baza_dobavljaca = ucitaj_dobavljace()
-        st.session_state.baza_komercijalista = ucitaj_komercijaliste()
         st.rerun()
 
     if not st.session_state.baza_naloga:
@@ -639,51 +616,27 @@ with tab2:
 if st.session_state.user_role == "admin":
     with tab3:
         st.subheader("🧹 Čišćenje i brisanje unosa (Admin Panel)")
-        st.markdown("Ovdje možete slobodno obrisati suvišne ili duple unose komercijalista i dobavljača iz baze.")
+        st.markdown("Ovdje možete slobodno obrisati unose komercijalista (i sve njihove pripadajuće naloge) ili suvišne dobavljače.")
         
         with st.container(border=True):
-            st.markdown("#### 👤 Brisanje komercijalista")
-            svi_kom_baza = sorted(list(st.session_state.baza_komercijalista.keys()))
-            if not svi_kom_baza:
-                # Fallback ako tablica komercijalista u Supabase-u nije kreirana, povuci iz naloga
-                svi_kom_baza = sorted(list(set(n["Komercijalist"] for n in st.session_state.baza_naloga if n["Komercijalist"])))
+            st.markdown("#### 👤 Brisanje komercijalista i njegovih naloga")
+            svi_kom_baza = sorted(list(set(n["Komercijalist"] for n in st.session_state.baza_naloga if n["Komercijalist"])))
             
             if svi_kom_baza:
-                col_kom1, col_kom2 = st.columns([2, 1])
-                kom_za_brisanje = col_kom1.selectbox("Odaberi komercijalista za brisanje:", svi_kom_baza, key="open_sel_kom_del")
+                col_k1, col_k2 = st.columns([2, 1])
+                kom_za_brisanje = col_k1.selectbox("Odaberi komercijalista:", svi_kom_baza, key="open_sel_kom_del")
                 
-                if col_kom2.button("🗑️ Obriši komercijalista", type="secondary", use_container_width=True):
+                if col_k2.button("🗑️ Obriši komercijalista i naloge", type="secondary", use_container_width=True):
                     if supabase and kom_za_brisanje:
                         try:
-                            # Briše iz tablice komercijalista ako postoji
-                            supabase.table("komercijalisti").delete().eq("naziv", kom_za_brisanje).execute()
-                            st.session_state.baza_komercijalista = ucitaj_komercijaliste()
-                            st.success(f"Uspješno obrisan komercijalist: {kom_za_brisanje}")
+                            supabase.table("nalozi").delete().eq("komercijalist", kom_za_brisanje).execute()
+                            st.session_state.baza_naloga = ucitaj_naloge()
+                            st.success(f"Uspješno obrisan komercijalist i svi njegovi unosi: {kom_za_brisanje}")
                             st.rerun()
                         except Exception as e:
                             st.error(f"Greška pri brisanju: {e}")
             else:
                 st.info("Nema komercijalista u bazi.")
-
-        with st.container(border=True):
-            st.markdown("#### 🗑️ Brisanje naloga po komercijalistu")
-            svi_kom_nalozi = sorted(list(set(n["Komercijalist"] for n in st.session_state.baza_naloga if n["Komercijalist"])))
-            
-            if svi_kom_nalozi:
-                col_k1, col_k2 = st.columns([2, 1])
-                kom_za_brisanje_naloga = col_k1.selectbox("Odaberi komercijalista (brisanje njegovih naloga):", svi_kom_nalozi, key="open_sel_kom_nalog")
-                
-                if col_k2.button("🗑️ Obriši sve naloge ovog komercijalista", type="secondary", use_container_width=True):
-                    if supabase and kom_za_brisanje_naloga:
-                        try:
-                            supabase.table("nalozi").delete().eq("komercijalist", kom_za_brisanje_naloga).execute()
-                            st.session_state.baza_naloga = ucitaj_naloge()
-                            st.success(f"Uspješno obrisani svi unosi za komercijalista: {kom_za_brisanje_naloga}")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Greška pri brisanju: {e}")
-            else:
-                st.info("Nema naloga za komercijaliste.")
 
         with st.container(border=True):
             st.markdown("#### 🏢 Brisanje dobavljača")
@@ -701,6 +654,6 @@ if st.session_state.user_role == "admin":
                             st.success(f"Uspješno obrisan dobavljač: {dob_za_brisanje}")
                             st.rerun()
                         except Exception as e:
-                            st.error(f"Greška pri brisanje: {e}")
+                            st.error(f"Greška pri brisanju: {e}")
             else:
                 st.info("Nema dobavljača u bazi.")
