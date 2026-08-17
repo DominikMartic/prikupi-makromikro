@@ -108,7 +108,7 @@ def spremi_ili_azuriraj_dobavljaca(naziv, kontakt, adresa, napomena):
             pass
 
 def spremi_ili_azuriraj_komercijalista(naziv):
-    if supabase and naziv and naziv != "Novi komercijalist...":
+    if supabase and naziv:
         try:
             podaci = {"naziv": naziv.strip()}
             supabase.table("komercijalisti").upsert(podaci, on_conflict="naziv").execute()
@@ -406,9 +406,9 @@ with tab1:
     if pp_data:
         st.info(f"🔄 Učitani podaci za ponovljeni prikup iz naloga **{pp_data.get('ID Naloga', '')}**")
 
-    # Dohvat komercijalista
-    komercijalisti_dict = st.session_state.baza_komercijalista
-    lista_komercijalista = ["Novi komercijalist..."] + sorted(list(komercijalisti_dict.keys()))
+    # Dohvat jedinstvenih komercijalista iz baze i postojećih naloga
+    postojeci_kom_iz_naloga = set(n["Komercijalist"] for n in st.session_state.baza_naloga if n["Komercijalist"] and n["Komercijalist"] != "-")
+    svi_komercijalisti_baza = sorted(list(set(list(st.session_state.baza_komercijalista.keys()) + list(postojeci_kom_iz_naloga))))
 
     # Dohvat dobavljača
     dobavljaci_dict = st.session_state.baza_dobavljaca
@@ -420,16 +420,35 @@ with tab1:
             tip = c1.selectbox("Tip dokumenta", ["Prikup", "Povrat"])
             datum = c3.date_input("Datum prikupa", datetime.now())
 
-            # Komercijalist opcija (Baza ili unos novog)
-            default_kom_index = 0
+            # Komercijalist polje (odabir iz postojeće baze imena ili ručni unos slobodnog teksta)
             pp_kom = pp_data.get("Komercijalist", "") if pp_data else ""
-            if pp_kom and pp_kom in lista_komercijalista:
-                default_kom_index = lista_komercijalista.index(pp_kom)
+            
+            # Stacemo tekstualni input povezan s popisom ili stvoriti kombinaciju
+            # U Streamlit-u tekstualni input služi za upis, a selectbox za odabir. 
+            # Ako želimo da se može odabrati ili upisati kao dobavljač:
+            opcije_komercijalist = ["Odaberi ili upiši novog..."] + svi_komercijalisti_baza
+            
+            odabrani_kom_izbor = c2.selectbox("Podnositelj zahtjeva (Komercijalist):", opcije_komercijalist)
+            
+            if odabrani_kom_izbor == "Odaberi ili upiši novog...":
+                komercijalist = st.text_input("Upišite ime komercijalista", value=pp_kom)
+            else:
+                komercijalist = odabrani_kom_izbor
+                # Omogućujemo da ako korisnik ipak želi prilagoditi, tekstualno polje nadjača ili stoji ispod
+                # Zapravo, jednostavnija praksa je tekstualni input s opcijom odabira ili zasebno polje za novi unos kao kod dobavljača.
+                # Prilagodit ćemo da bude identično logici dobavljača ukoliko nema na popisu:
 
-            odabrani_kom_opcija = c2.selectbox("Podnositelj zahtjeva (Komercijalist):", lista_komercijalista, index=default_kom_index)
+            # Vraćamo logiku identičnu dobavljaču:
+            lista_komercijalista_opcije = ["Novi komercijalist..."] + svi_komercijalisti_baza
+            
+            default_kom_index = 0
+            if pp_kom and pp_kom in lista_komercijalista_opcije:
+                default_kom_index = lista_komercijalista_opcije.index(pp_kom)
+
+            odabrani_kom_opcija = c2.selectbox("Podnositelj zahtjeva (Komercijalist):", lista_komercijalista_opcije, index=default_kom_index)
             
             if odabrani_kom_opcija == "Novi komercijalist...":
-                komercijalist = st.text_input("Upišite novog komercijalista", value=pp_kom if pp_kom not in lista_komercijalista else "")
+                komercijalist = st.text_input("Upišite novog komercijalista", value=pp_kom if pp_kom not in lista_komercijalista_opcije else "")
             else:
                 komercijalist = odabrani_kom_opcija
 
