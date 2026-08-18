@@ -373,7 +373,7 @@ if st.session_state.user_role == "vozac":
 
     st.stop()
 
-# Dinamičko kreiranje kartica ovisno o ulozi (Admin dobiva dodatnu karticu za čišćenje baze)
+# Dinamičko kreiranje kartica ovisno o ulozi
 if st.session_state.user_role == "admin":
     tab1, tab2, tab3 = st.tabs(["✨ Unos Novog Naloga", "📊 Pregled & Upravljanje", "🧹 Čišćenje baze"])
 else:
@@ -407,11 +407,25 @@ with tab1:
         zadana_adresa = pp_data.get("Adresa Prikupa", "") if pp_data else ""
         zadana_napomena = pp_data.get("Napomena", "") if pp_data else ""
 
+    # Dohvaćanje postojećih komercijalista za pametni odabir
+    postojeci_komercijalisti = sorted(list(set(n["Komercijalist"] for n in st.session_state.baza_naloga if n.get("Komercijalist") and n.get("Komercijalist") != "-")))
+    lista_komercijalista_opcije = ["Unesi novog..."] + postojeci_komercijalisti
+
     with st.container(border=True):
+        # Izbor tipa i podnositelja izvan forme kako bi selectbox ispravno osvježavao vrijednost
+        ck1, ck2 = st.columns(2)
+        tip = ck1.selectbox("Tip dokumenta", ["Prikup", "Povrat"])
+        
+        kom_opcija = ck2.selectbox("Podnositelj zahtjeva (Odaberi ili unesi):", lista_komercijalista_opcije)
+        if kom_opcija == "Unesi novog...":
+            komercijalist = st.text_input("Upišite ime novog podnositelja zahtjeva", value=pp_data.get("Komercijalist", "") if pp_data else "")
+        else:
+            komercijalist = kom_opcija
+
         with st.form("forma_unos", clear_on_submit=True):
             c1, c2, c3 = st.columns(3)
-            tip = c1.selectbox("Tip dokumenta", ["Prikup", "Povrat"])
-            komercijalist = c2.text_input("Podnositelj zahtjeva", value=pp_data.get("Komercijalist", "") if pp_data else "")
+            c1.markdown(f"**Tip:** {tip}")
+            c2.markdown(f"**Podnositelj:** {komercijalist if komercijalist else '*(Nije upisan)*'}")
             datum = c3.date_input("Datum prikupa", datetime.now())
 
             c4, c5 = st.columns(2)
@@ -433,7 +447,6 @@ with tab1:
                 else:
                     prefiks = "PR" if tip == "Prikup" else "POV"
                     
-                    # Automatsko pronalaženje sljedećeg slobodnog broja iz baze kako bi se izbjegao dupli ključ
                     postojeci_brojevi = []
                     for n in st.session_state.baza_naloga:
                         n_id = n.get("ID Naloga", "")
