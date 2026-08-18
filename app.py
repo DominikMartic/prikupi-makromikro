@@ -431,9 +431,21 @@ with tab1:
                 if not komercijalist or not dobavljac or not adresa_prikupa or not opis:
                     st.error("Ispunite obavezna polja!")
                 else:
-                    broj = len(st.session_state.baza_naloga) + 1
                     prefiks = "PR" if tip == "Prikup" else "POV"
-                    id_naloga = f"{prefiks}-2026-{broj:03d}"
+                    
+                    # Automatsko pronalaženje sljedećeg slobodnog broja iz baze kako bi se izbjegao dupli ključ
+                    postojeci_brojevi = []
+                    for n in st.session_state.baza_naloga:
+                        n_id = n.get("ID Naloga", "")
+                        if n_id.startswith(prefiks):
+                            try:
+                                zadnji_dio = int(n_id.split("-")[-1])
+                                postojeci_brojevi.append(zadnji_dio)
+                            except ValueError:
+                                pass
+                    
+                    sljedeci_broj = max(postojeci_brojevi) + 1 if postojeci_brojevi else 1
+                    id_naloga = f"{prefiks}-2026-{sljedeci_broj:03d}"
                     
                     novi_nalog = {
                         "ID Naloga": id_naloga,
