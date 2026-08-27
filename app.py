@@ -49,7 +49,7 @@ try:
 except Exception:
     supabase = None
 
-# Pomoćna funkcija za dodavanje radnih dana (preskače subotu i nedjelju)
+# Pomoćna funkcija: ako je broj_dana = 1, vraća prvi sljedeći radni dan (npr. srijeda 27.8. -> četvrtak 28.8.)
 def dodaj_radne_dane(pocetni_datum, broj_dana):
     trenutni = pocetni_datum
     dodani = 0
@@ -436,14 +436,14 @@ with tab1:
             c1.markdown(f"**Tip:** {tip}")
             c2.markdown(f"**Podnositelj:** {komercijalist if komercijalist else '*(Nije upisan)*'}")
             
-            # AUTOMATSKI IZRAČUN: Ako je Prikup, postavlja se na 2. radni dan (preskače vikend). Ako je Povrat, stavlja se današnji datum.
+            # ISPRAVLJENO: 1 radni dan umjesto 2 (ako je danas 27.8., prvu idući radni dan je 28.8.)
             if pp_data and pp_data.get("Datum Prikupa"):
                 try:
                     inicijalni_datum = datetime.strptime(pp_data.get("Datum Prikupa"), "%Y-%m-%d").date()
                 except Exception:
-                    inicijalni_datum = dodaj_radne_dane(datetime.now().date(), 2) if tip == "Prikup" else datetime.now().date()
+                    inicijalni_datum = dodaj_radne_dane(datetime.now().date(), 1) if tip == "Prikup" else datetime.now().date()
             else:
-                inicijalni_datum = dodaj_radne_dane(datetime.now().date(), 2) if tip == "Prikup" else datetime.now().date()
+                inicijalni_datum = dodaj_radne_dane(datetime.now().date(), 1) if tip == "Prikup" else datetime.now().date()
 
             datum = c3.date_input("Datum prikupa", value=inicijalni_datum)
 
@@ -643,7 +643,7 @@ with tab2:
                         novi_status = st.selectbox("Status", statusi_opcije, index=statusi_opcije.index(nalog['Status']) if nalog['Status'] in statusi_opcije else 0, key=f"st_{nalog['ID Naloga']}_{i}", label_visibility="collapsed")
                         if novi_status != nalog['Status']:
                             vrijeme = f"{datetime.now().strftime('%d.%m.%Y. %H:%M')}" if novi_status == "Prikupljeno" else "-"
-                            azuriraj_status_naloga(nalog['ID Naloga'], novi_status, vrijeme)
+                            azuriraj_status_log_naloga = azuriraj_status_naloga(nalog['ID Naloga'], novi_status, vrijeme)
                             st.session_state.baza_naloga = ucitaj_naloge()
                             st.rerun()
                     else:
