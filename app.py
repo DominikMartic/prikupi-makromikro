@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 import io
 import html
 import os
@@ -48,6 +48,17 @@ try:
     supabase = init_supabase()
 except Exception:
     supabase = None
+
+# Pomoćna funkcija za dodavanje radnih dana (preskače subotu i nedjelju)
+def dodaj_radne_dane(pocetni_datum, broj_dana):
+    trenutni = pocetni_datum
+    dodani = 0
+    while dodani < broj_dana:
+        trenutni += timedelta(days=1)
+        # Ako nije subota (5) ni nedjelja (6)
+        if trenutni.weekday() < 5:
+            dodani += 1
+    return trenutni
 
 def ucitaj_naloge():
     if supabase:
@@ -407,12 +418,10 @@ with tab1:
         zadana_adresa = pp_data.get("Adresa Prikupa", "") if pp_data else ""
         zadana_napomena = pp_data.get("Napomena", "") if pp_data else ""
 
-    # Dohvaćanje postojećih komercijalista za pametni odabir
     postojeci_komercijalisti = sorted(list(set(n["Komercijalist"] for n in st.session_state.baza_naloga if n.get("Komercijalist") and n.get("Komercijalist") != "-")))
     lista_komercijalista_opcije = ["Unesi novog..."] + postojeci_komercijalisti
 
     with st.container(border=True):
-        # Izbor tipa i podnositelja izvan forme kako bi selectbox ispravno osvježavao vrijednost
         ck1, ck2 = st.columns(2)
         tip = ck1.selectbox("Tip dokumenta", ["Prikup", "Povrat"])
         
@@ -426,7 +435,17 @@ with tab1:
             c1, c2, c3 = st.columns(3)
             c1.markdown(f"**Tip:** {tip}")
             c2.markdown(f"**Podnositelj:** {komercijalist if komercijalist else '*(Nije upisan)*'}")
-            datum = c3.date_input("Datum prikupa", datetime.now())
+            
+            # AUTOMATSKI IZRAČUN: Ako je Prikup, postavlja se na 2. radni dan (preskače vikend). Ako je Povrat, stavlja se današnji datum.
+            if pp_data and pp_data.get("Datum Prikupa"):
+                try:
+                    inicijalni_datum = datetime.strptime(pp_data.get("Datum Prikupa"), "%Y-%m-%d").date()
+                except Exception:
+                    inicijalni_datum = dodaj_radne_dane(datetime.now().date(), 2) if tip == "Prikup" else datetime.now().date()
+            else:
+                inicijalni_datum = dodaj_radne_dane(datetime.now().date(), 2) if tip == "Prikup" else datetime.now().date()
+
+            datum = c3.date_input("Datum prikupa", value=inicijalni_datum)
 
             c4, c5 = st.columns(2)
             dobavljac = c4.text_input("Dobavljač", value=zadati_naziv)
@@ -657,28 +676,5 @@ if st.session_state.user_role == "admin":
                             supabase.table("nalozi").delete().eq("komercijalist", kom_za_brisanje).execute()
                             st.session_state.baza_naloga = ucitaj_naloge()
                             st.success(f"Uspješno obrisan komercijalist i svi njegovi unosi: {kom_za_brisanje}")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Greška pri brisanju: {e}")
-            else:
-                st.info("Nema komercijalista u bazi.")
-
-        with st.container(border=True):
-            st.markdown("#### 🏢 Brisanje dobavljača")
-            svi_dob_baza = sorted(list(st.session_state.baza_dobavljaca.keys()))
-            
-            if svi_dob_baza:
-                col_d1, col_d2 = st.columns([2, 1])
-                dob_za_brisanje = col_d1.selectbox("Odaberi dobavljača:", svi_dob_baza, key="open_sel_dob")
-                
-                if col_d2.button("🗑️ Obriši dobavljača", type="secondary", use_container_width=True):
-                    if supabase and dob_za_brisanje:
-                        try:
-                            supabase.table("dobavljaci").delete().eq("naziv", dob_za_brisanje).execute()
-                            st.session_state.baza_dobavljaca = ucitaj_dobavljace()
-                            st.success(f"Uspješno obrisan dobavljač: {dob_za_brisanje}")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Greška pri brisanju: {e}")
-            else:
-                st.info("Nema dobavljača u bazi.")
+                        except Exception:
+                            pass
