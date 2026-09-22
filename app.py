@@ -389,14 +389,19 @@ if st.session_state.user_role == "vozac":
 
     st.stop()
 
-# Navigacijski izbornik preko radio gumba s ključem u session_state-u
+# Navigacijski izbornik preko radio gumba (bez ručnog override-a state-a widgeta)
 opcije_navigacije = ["✨ Unos novog naloga", "📊 Pregled & Upravljanje"]
 if st.session_state.user_role == "admin":
     opcije_navigacije.append("🧹 Čišćenje baze")
 
+# Osiguravamo da je odabrana opcija unutar dozvoljenih granica
+if st.session_state.navigacija not in opcije_navigacije:
+    st.session_state.navigacija = opcije_navigacije[0]
+
 st.session_state.navigacija = st.radio(
     "Navigacija", 
     opcije_navigacije, 
+    index=opcije_navigacije.index(st.session_state.navigacija),
     horizontal=True, 
     label_visibility="collapsed", 
     key="navigacija_radio"
@@ -674,8 +679,7 @@ elif st.session_state.navigacija == "📊 Pregled & Upravljanje":
                     
                     if sub_c2.button("🔄", key=f"r_{nalog['ID Naloga']}_{i}", use_container_width=True, help="Ponovi nalog"):
                         st.session_state.ponovi_prikup_data = nalog
-                        st.session_state.navigacija = "✨ Unos novog naloga"
-                        st.session_state.navigacija_radio = "✨ Unos novog naloga"  # Odmah miče radio gumb na novu karticu
+                        st.session_state.navigacija = "✨ Unos novog naloga"  # Ispravno mijenja stanje navigacije bez greške
                         st.rerun()
 
                     if is_komercijala and nalog['Status'] != "Storno":
