@@ -15,7 +15,6 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
-# Registracija lokalnih fontova za ispravan prikaz hrvatskih znakova (č, ć, ž, š, đ) u PDF-u
 def registriraj_fontove():
     regular_path = "DejaVuSans.ttf"
     bold_path = "DejaVuSans-Bold.ttf"
@@ -156,9 +155,8 @@ if "user_role" not in st.session_state:
 if "ponovi_prikup_data" not in st.session_state:
     st.session_state.ponovi_prikup_data = None
 
-# Kontrola odabrane kartice (tab-a)
-if "active_tab" not in st.session_state:
-    st.session_state.active_tab = 0
+if "navigacija" not in st.session_state:
+    st.session_state.navigacija = "✨ Unos novog naloga"
 
 if "scanned_id" not in st.session_state:
     st.session_state.scanned_id = None
@@ -391,15 +389,15 @@ if st.session_state.user_role == "vozac":
 
     st.stop()
 
-# Definiranje kartica ovisno o ulozi
+# Navigacijski izbornik preko radio gumba (omogućuje automatsko prebacivanje)
+opcije_navigacije = ["✨ Unos novog naloga", "📊 Pregled & Upravljanje"]
 if st.session_state.user_role == "admin":
-    tabs = st.tabs(["✨ Unos Novog Naloga", "📊 Pregled & Upravljanje", "🧹 Čišćenje baze"])
-    tab1, tab2, tab3 = tabs[0], tabs[1], tabs[2]
-else:
-    tabs = st.tabs(["✨ Unos Novog Naloga", "📊 Pregled & Upravljanje"])
-    tab1, tab2 = tabs[0], tabs[1]
+    opcije_navigacije.append("🧹 Čišćenje baze")
 
-with tab1:
+st.session_state.navigacija = st.radio("Navigacija", opcije_navigacije, horizontal=True, label_visibility="collapsed")
+st.markdown("---")
+
+if st.session_state.navigacija == "✨ Unos novog naloga":
     st.subheader("Unos novog naloga")
     pp_data = st.session_state.ponovi_prikup_data
     if pp_data:
@@ -508,7 +506,7 @@ with tab1:
                     st.session_state.ponovi_prikup_data = None
                     st.success(f"Nalog {id_naloga} uspješno spremljen u bazu!")
 
-with tab2:
+elif st.session_state.navigacija == "📊 Pregled & Upravljanje":
     col_h1, col_h2 = st.columns([3, 1])
     col_h1.subheader("📋 Pregled & Upravljanje nalozima")
     if col_h2.button("🔄 Osvježi", use_container_width=True):
@@ -670,6 +668,7 @@ with tab2:
                     
                     if sub_c2.button("🔄", key=f"r_{nalog['ID Naloga']}_{i}", use_container_width=True, help="Ponovi nalog"):
                         st.session_state.ponovi_prikup_data = nalog
+                        st.session_state.navigacija = "✨ Unos novog naloga"
                         st.rerun()
 
                     if is_komercijala and nalog['Status'] != "Storno":
@@ -681,25 +680,23 @@ with tab2:
                             st.success(f"Nalog {nalog['ID Naloga']} uspješno storniran!")
                             st.rerun()
 
-# Čišćenje baze (Admin Panel)
-if st.session_state.user_role == "admin":
-    with (tabs[2] if len(tabs) > 2 else tab3):
-        st.subheader("🧹 Čišćenje i brisanje unosa (Admin Panel)")
-        st.markdown("Ovdje možete slobodno obrisati unose komercijalista (i sve njihove pripadajuće naloge) ili suvišne dobavljače.")
+elif st.session_state.user_role == "admin" and st.session_state.navigacija == "🧹 Čišćenje baze":
+    st.subheader("🧹 Čišćenje i brisanje unosa (Admin Panel)")
+    st.markdown("Ovdje možete slobodno obrisati unose komercijalista (i sve njihove pripadajuće naloge) ili suvišne dobavljače.")
+    
+    with st.container(border=True):
+        st.markdown("#### 👤 Brisanje komercijalista i njegovih naloga")
+        svi_kom_baza = sorted(list(set(n["Komercijalist"] for n in st.session_state.baza_naloga if n["Komercijalist"])))
         
-        with st.container(border=True):
-            st.markdown("#### 👤 Brisanje komercijalista i njegovih naloga")
-            svi_kom_baza = sorted(list(set(n["Komercijalist"] for n in st.session_state.baza_naloga if n["Komercijalist"])))
+        if svi_kom_baza:
+            col_k1, col_k2 = st.columns([2, 1])
+            kom_za_brisanje = col_k1.selectbox("Odaberi komercijalista:", svi_kom_baza, key="open_sel_kom_del")
             
-            if svi_kom_baza:
-                col_k1, col_k2 = st.columns([2, 1])
-                kom_za_brisanje = col_k1.selectbox("Odaberi komercijalista:", svi_kom_baza, key="open_sel_kom_del")
-                
-                if col_k2.button("🗑️ Obriši komercijalista i naloge", type="secondary", use_container_width=True):
-                    if supabase and kom_za_brisanje:
-                        try:
-                            supabase.table("nalozi").delete().eq("komercijalist", kom_za_brisanje).execute()
-                            st.session_state.baza_naloga = ucitaj_naloge()
-                            st.success(f"Uspješno obrisan komercijalist i svi njegovi unosi: {kom_za_brisanje}")
-                        except Exception:
-                            pass
+            if col_k2.button("🗑️ Obriši komercijalista i naloge", type="secondary", use_container_width=True):
+                if supabase and kom_za_brisanje:
+                    try:
+                        supabase.table("nalozi").delete().eq("komercijalist", kom_za_brisanje).execute()
+                        st.session_state.baza_naloga = ucitaj_naloge()
+                        st.success(f"Uspješno obrisan komercijalist i svi njegovi unosi: {kom_za_brisanje}")
+                    except Exception:
+                        pass
