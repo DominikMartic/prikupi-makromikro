@@ -418,23 +418,14 @@ if st.session_state.user_role == "admin":
 if st.session_state.navigacija not in opcije_navigacije:
     st.session_state.navigacija = opcije_navigacije[0]
 
-# Forsiramo Streamlitov unutrašnji ključ radio gumba da prihvati novu vrijednost
-st.session_state["radio_navigacija_kljuc"] = st.session_state.navigacija
-
-indeks_trenutni = opcije_navigacije.index(st.session_state.navigacija)
-
+# Korištenje ključa "navigacija" direktno povezuje st.radio sa st.session_state.navigacija
 odabrana_navigacija = st.radio(
     "Navigacija", 
     opcije_navigacije, 
-    index=indeks_trenutni,
     horizontal=True, 
     label_visibility="collapsed",
-    key="radio_navigacija_kljuc"
+    key="navigacija"
 )
-
-if odabrana_navigacija != st.session_state.navigacija:
-    st.session_state.navigacija = odabrana_navigacija
-    st.rerun()
 
 st.markdown("---")
 
