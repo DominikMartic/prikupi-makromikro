@@ -389,12 +389,18 @@ if st.session_state.user_role == "vozac":
 
     st.stop()
 
-# Navigacijski izbornik preko radio gumba (omogućuje automatsko prebacivanje)
+# Navigacijski izbornik preko radio gumba s ključem u session_state-u
 opcije_navigacije = ["✨ Unos novog naloga", "📊 Pregled & Upravljanje"]
 if st.session_state.user_role == "admin":
     opcije_navigacije.append("🧹 Čišćenje baze")
 
-st.session_state.navigacija = st.radio("Navigacija", opcije_navigacije, horizontal=True, label_visibility="collapsed")
+st.session_state.navigacija = st.radio(
+    "Navigacija", 
+    opcije_navigacije, 
+    horizontal=True, 
+    label_visibility="collapsed", 
+    key="navigacija_radio"
+)
 st.markdown("---")
 
 if st.session_state.navigacija == "✨ Unos novog naloga":
