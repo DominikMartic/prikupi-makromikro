@@ -175,7 +175,6 @@ if "uspjeh_poruka" not in st.session_state:
 if "reset_form_flag" not in st.session_state:
     st.session_state.reset_form_flag = False
 
-# Provjera i izvršavanje reseta prije ispisivanja widgeta
 if st.session_state.reset_form_flag:
     st.session_state["select_dob_main"] = "Novi dobavljac..."
     st.session_state["select_tip_main"] = "Prikup"
@@ -540,7 +539,6 @@ if st.session_state.navigacija == "✨ Unos novog naloga":
                     st.session_state.baza_dobavljaca = ucitaj_dobavljace()
                     st.session_state.ponovi_prikup_data = None
                     
-                    # Postavljanje zastavice za resetiranje widgeta na početku idućeg pokretanja
                     st.session_state.reset_form_flag = True
                     st.session_state.uspjeh_poruka = f"Nalog {id_naloga} uspješno spremljen u bazu!"
                     st.rerun()
@@ -710,7 +708,8 @@ elif st.session_state.navigacija == "📊 Pregled & Upravljanje":
                         st.session_state.navigacija = "✨ Unos novog naloga"
                         st.rerun()
 
-                    if is_komercijala and nalog['Status'] != "Storno":
+                    # Komercijala može stornirati SAMO ako je nalog u statusu "Na čekanju"
+                    if is_komercijala and nalog['Status'] == "Na čekanju":
                         if sub_c3.button("❌", key=f"storno_{nalog['ID Naloga']}_{i}", use_container_width=True, type="secondary", help="Storniraj nalog"):
                             vrijeme_storna = hrv_sada().strftime('%d.%m.%Y. %H:%M')
                             tko_storno = f"Komercijala ({nalog['Komercijalist']}) - {vrijeme_storna}"
