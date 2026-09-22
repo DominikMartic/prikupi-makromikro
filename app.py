@@ -425,7 +425,8 @@ odabrana_navigacija = st.radio(
     opcije_navigacije, 
     index=indeks_trenutni,
     horizontal=True, 
-    label_visibility="collapsed"
+    label_visibility="collapsed",
+    key="radio_navigacija_kljuc"
 )
 
 if odabrana_navigacija != st.session_state.navigacija:
@@ -708,7 +709,6 @@ elif st.session_state.navigacija == "📊 Pregled & Upravljanje":
                         st.session_state.navigacija = "✨ Unos novog naloga"
                         st.rerun()
 
-                    # Komercijala može stornirati SAMO ako je nalog u statusu "Na čekanju"
                     if is_komercijala and nalog['Status'] == "Na čekanju":
                         if sub_c3.button("❌", key=f"storno_{nalog['ID Naloga']}_{i}", use_container_width=True, type="secondary", help="Storniraj nalog"):
                             vrijeme_storna = hrv_sada().strftime('%d.%m.%Y. %H:%M')
