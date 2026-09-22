@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 import io
 import html
 import os
@@ -14,6 +15,10 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+
+def hrv_sada():
+    """Vraća trenutni datetime u hrvatskoj vremenskoj zoni."""
+    return datetime.now(ZoneInfo("Europe/Zagreb"))
 
 def registriraj_fontove():
     regular_path = "DejaVuSans.ttf"
@@ -317,7 +322,7 @@ if st.session_state.user_role == "vozac":
                 st.info(f"Pronađen nalog: **{postojeci_nalog['ID Naloga']}** ({postojeci_nalog['Dobavljac']})")
                 if postojeci_nalog['Status'] != "Prikupljeno":
                     if col_s1.button("🚀 Automatski prebaci u PREUZETO", type="primary", use_container_width=True):
-                        vrijeme_sada = datetime.now().strftime('%d.%m.%Y. %H:%M')
+                        vrijeme_sada = hrv_sada().strftime('%d.%m.%Y. %H:%M')
                         azuriraj_status_naloga(postojeci_nalog['ID Naloga'], "Prikupljeno", vrijeme_sada)
                         st.session_state.baza_naloga = ucitaj_naloge()
                         st.session_state.scanned_id = ""
@@ -352,7 +357,7 @@ if st.session_state.user_role == "vozac":
                 else:
                     st.info(f"⏳ Trenutni status: {nalog['Status']}")
                     if st.button(f"✅ OZNAČI KAO PREUZETO ({nalog['ID Naloga']})", key=f"btn_prev_{nalog['ID Naloga']}_{i}", type="primary", use_container_width=True):
-                        vrijeme_sada = datetime.now().strftime('%d.%m.%Y. %H:%M')
+                        vrijeme_sada = hrv_sada().strftime('%d.%m.%Y. %H:%M')
                         azuriraj_status_naloga(nalog['ID Naloga'], "Prikupljeno", vrijeme_sada)
                         st.session_state.baza_naloga = ucitaj_naloge()
                         st.success("Uspješno označeno kao preuzeto!")
@@ -389,7 +394,6 @@ if st.session_state.user_role == "vozac":
 
     st.stop()
 
-# Navigacijski izbornik bez konfliktnog ključa da gumb za ponavljanje naloga može mijenjati karticu
 opcije_navigacije = ["✨ Unos novog naloga", "📊 Pregled & Upravljanje"]
 if st.session_state.user_role == "admin":
     opcije_navigacije.append("🧹 Čišćenje baze")
@@ -459,8 +463,8 @@ if st.session_state.navigacija == "✨ Unos novog naloga":
             c1.markdown(f"**Tip:** {tip}")
             c2.markdown(f"**Podnositelj:** {komercijalist if komercijalist else '*(Nije upisan)*'}")
             
-            # Datum je uvijek idući radni dan, bez obzira na Tip (Prikup ili Povrat)
-            inicijalni_datum = dodaj_radne_dane(datetime.now().date(), 1)
+            # Datum se računa od hrvatskog lokalnog vremena kao idući radni dan
+            inicijalni_datum = dodaj_radne_dane(hrv_sada().date(), 1)
             datum = c3.date_input("Datum prikupa", value=inicijalni_datum)
 
             c4, c5 = st.columns(2)
@@ -595,7 +599,7 @@ elif st.session_state.navigacija == "📊 Pregled & Upravljanje":
             )
 
             nalozi_za_izvoz = filtrirani
-            sadasnji_datum = datetime.now()
+            sadasnji_datum = hrv_sada()
 
             if period_izvoza == "Tekući tjedan":
                 pocetak_tjedna = (sadasnji_datum - pd.Timedelta(days=sadasnji_datum.weekday())).strftime('%Y-%m-%d')
@@ -616,7 +620,7 @@ elif st.session_state.navigacija == "📊 Pregled & Upravljanje":
                 ex_c3.download_button(
                     label="📥 Preuzmi CSV izvještaj",
                     data=csv_data,
-                    file_name=f"Makromikro_Analiza_{period_izvoza.lower().replace(' ', '_')}_{datetime.now().strftime('%Y-%m-%d')}.csv",
+                    file_name=f"Makromikro_Analiza_{period_izvoza.lower().replace(' ', '_')}_{hrv_sada().strftime('%d-%m-%Y')}.csv",
                     mime="text/csv",
                     type="primary",
                     use_container_width=True
@@ -633,7 +637,7 @@ elif st.session_state.navigacija == "📊 Pregled & Upravljanje":
             download_clicked = st.download_button(
                 label=f"📄 Preuzmi PDF Zbirni Zahtjev ({len(za_print)} naloga)",
                 data=pdf_bytes,
-                file_name=f"Zahtjev_za_transport_{datetime.now().strftime('%Y-%m-%d')}.pdf",
+                file_name=f"Zahtjev_za_transport_{hrv_sada().strftime('%d-%m-%Y')}.pdf",
                 mime="application/pdf",
                 type="primary"
             )
@@ -664,8 +668,8 @@ elif st.session_state.navigacija == "📊 Pregled & Upravljanje":
                     if is_admin:
                         novi_status = st.selectbox("Status", statusi_opcije, index=statusi_opcije.index(nalog['Status']) if nalog['Status'] in statusi_opcije else 0, key=f"st_{nalog['ID Naloga']}_{i}", label_visibility="collapsed")
                         if novi_status != nalog['Status']:
-                            vrijeme = f"{datetime.now().strftime('%d.%m.%Y. %H:%M')}" if novi_status == "Prikupljeno" else "-"
-                            tko_storno = f"Admin ({datetime.now().strftime('%d.%m.%Y. %H:%M')})" if novi_status == "Storno" else "-"
+                            vrijeme = f"{hrv_sada().strftime('%d.%m.%Y. %H:%M')}" if novi_status == "Prikupljeno" else "-"
+                            tko_storno = f"Admin ({hrv_sada().strftime('%d.%m.%Y. %H:%M')})" if novi_status == "Storno" else "-"
                             azuriraj_status_naloga(nalog['ID Naloga'], novi_status, vrijeme, tko_storno)
                             st.session_state.baza_naloga = ucitaj_naloge()
                             st.rerun()
@@ -683,7 +687,7 @@ elif st.session_state.navigacija == "📊 Pregled & Upravljanje":
 
                     if is_komercijala and nalog['Status'] != "Storno":
                         if sub_c3.button("❌", key=f"storno_{nalog['ID Naloga']}_{i}", use_container_width=True, type="secondary", help="Storniraj nalog"):
-                            vrijeme_storna = datetime.now().strftime('%d.%m.%Y. %H:%M')
+                            vrijeme_storna = hrv_sada().strftime('%d.%m.%Y. %H:%M')
                             tko_storno = f"Komercijala ({nalog['Komercijalist']}) - {vrijeme_storna}"
                             azuriraj_status_naloga(nalog['ID Naloga'], "Storno", "-", tko_storno)
                             st.session_state.baza_naloga = ucitaj_naloge()
