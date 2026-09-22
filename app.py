@@ -675,6 +675,7 @@ elif st.session_state.navigacija == "📊 Pregled & Upravljanje":
                     if sub_c2.button("🔄", key=f"r_{nalog['ID Naloga']}_{i}", use_container_width=True, help="Ponovi nalog"):
                         st.session_state.ponovi_prikup_data = nalog
                         st.session_state.navigacija = "✨ Unos novog naloga"
+                        st.session_state.navigacija_radio = "✨ Unos novog naloga"  # Odmah miče radio gumb na novu karticu
                         st.rerun()
 
                     if is_komercijala and nalog['Status'] != "Storno":
