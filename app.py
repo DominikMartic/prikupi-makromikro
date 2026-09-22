@@ -459,14 +459,8 @@ if st.session_state.navigacija == "✨ Unos novog naloga":
             c1.markdown(f"**Tip:** {tip}")
             c2.markdown(f"**Podnositelj:** {komercijalist if komercijalist else '*(Nije upisan)*'}")
             
-            if pp_data and pp_data.get("Datum Prikupa"):
-                try:
-                    inicijalni_datum = datetime.strptime(pp_data.get("Datum Prikupa"), "%Y-%m-%d").date()
-                except Exception:
-                    inicijalni_datum = dodaj_radne_dane(datetime.now().date(), 1) if tip == "Prikup" else datetime.now().date()
-            else:
-                inicijalni_datum = dodaj_radne_dane(datetime.now().date(), 1) if tip == "Prikup" else datetime.now().date()
-
+            # Datum je uvijek idući radni dan, bez obzira na Tip (Prikup ili Povrat)
+            inicijalni_datum = dodaj_radne_dane(datetime.now().date(), 1)
             datum = c3.date_input("Datum prikupa", value=inicijalni_datum)
 
             c4, c5 = st.columns(2)
