@@ -166,6 +166,12 @@ if "navigacija" not in st.session_state:
 if "scanned_id" not in st.session_state:
     st.session_state.scanned_id = None
 
+if "selected_dob_idx" not in st.session_state:
+    st.session_state.selected_dob_idx = 0
+
+if "uspjeh_poruka" not in st.session_state:
+    st.session_state.uspjeh_poruka = None
+
 query_params = st.query_params
 if "role" in query_params:
     st.session_state.user_role = query_params.get("role")
@@ -419,6 +425,12 @@ st.markdown("---")
 
 if st.session_state.navigacija == "✨ Unos novog naloga":
     st.subheader("Unos novog naloga")
+
+    # Prikaz poruke o uspjehu ako postoji u session state-u
+    if st.session_state.uspjeh_poruka:
+        st.success(st.session_state.uspjeh_poruka)
+        st.session_state.uspjeh_poruka = None
+
     pp_data = st.session_state.ponovi_prikup_data
     if pp_data:
         st.info(f"🔄 Učitani podaci za ponovljeni prikup iz naloga **{pp_data.get('ID Naloga', '')}**")
@@ -426,12 +438,11 @@ if st.session_state.navigacija == "✨ Unos novog naloga":
     dobavljaci_dict = st.session_state.baza_dobavljaca
     lista_dobavljaca = ["Novi dobavljac..."] + sorted(list(dobavljaci_dict.keys()))
 
-    c_dob1, _ = st.columns([1, 1])
-    default_dob_index = 0
     if pp_data and pp_data.get("Dobavljac") in lista_dobavljaca:
-        default_dob_index = lista_dobavljaca.index(pp_data.get("Dobavljac"))
+        st.session_state.selected_dob_idx = lista_dobavljaca.index(pp_data.get("Dobavljac"))
 
-    odabrani_dobavljac_opcija = c_dob1.selectbox("Odaberi dobavljača:", lista_dobavljaca, index=default_dob_index)
+    c_dob1, _ = st.columns([1, 1])
+    odabrani_dobavljac_opcija = c_dob1.selectbox("Odaberi dobavljača:", lista_dobavljaca, index=st.session_state.selected_dob_idx, key="select_dob_main")
 
     if odabrani_dobavljac_opcija != "Novi dobavljac...":
         podaci_dob = dobavljaci_dict.get(odabrani_dobavljac_opcija, {})
@@ -463,7 +474,6 @@ if st.session_state.navigacija == "✨ Unos novog naloga":
             c1.markdown(f"**Tip:** {tip}")
             c2.markdown(f"**Podnositelj:** {komercijalist if komercijalist else '*(Nije upisan)*'}")
             
-            # Datum se računa od hrvatskog lokalnog vremena kao idući radni dan
             inicijalni_datum = dodaj_radne_dane(hrv_sada().date(), 1)
             datum = c3.date_input("Datum prikupa", value=inicijalni_datum)
 
@@ -518,7 +528,9 @@ if st.session_state.navigacija == "✨ Unos novog naloga":
                     st.session_state.baza_naloga = ucitaj_naloge()
                     st.session_state.baza_dobavljaca = ucitaj_dobavljace()
                     st.session_state.ponovi_prikup_data = None
-                    st.success(f"Nalog {id_naloga} uspješno spremljen u bazu!")
+                    st.session_state.selected_dob_idx = 0
+                    st.session_state.uspjeh_poruka = f"Nalog {id_naloga} uspješno spremljen u bazu!"
+                    st.rerun()
 
 elif st.session_state.navigacija == "📊 Pregled & Upravljanje":
     col_h1, col_h2 = st.columns([3, 1])
