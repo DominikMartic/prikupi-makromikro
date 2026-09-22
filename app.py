@@ -49,13 +49,11 @@ try:
 except Exception:
     supabase = None
 
-# Pomoćna funkcija: ako je broj_dana = 1, vraća prvi sljedeći radni dan (npr. srijeda 27.8. -> četvrtak 28.8.)
 def dodaj_radne_dane(pocetni_datum, broj_dana):
     trenutni = pocetni_datum
     dodani = 0
     while dodani < broj_dana:
         trenutni += timedelta(days=1)
-        # Ako nije subota (5) ni nedjelja (6)
         if trenutni.weekday() < 5:
             dodani += 1
     return trenutni
@@ -80,6 +78,7 @@ def ucitaj_naloge():
                     "Napomena": r.get("napomena", "-"),
                     "Status": r.get("status", "-"),
                     "Vrijeme Obrade": r.get("vrijeme_obrade", "-"),
+                    "Stornirao": r.get("stornirao", "-"),
                     "Datum Kreiranja": r.get("created_at", "-")
                 })
             return nalozi
@@ -124,20 +123,24 @@ def spremi_novi_nalog(n):
                 "opis_robe": n["Opis robe"],
                 "napomena": n["Napomena"],
                 "status": n["Status"],
-                "vrijeme_obrade": n["Vrijeme Obrade"]
+                "vrijeme_obrade": n["Vrijeme Obrade"],
+                "stornirao": "-"
             }
             supabase.table("nalozi").insert(data).execute()
             spremi_ili_azuriraj_dobavljaca(n["Dobavljac"], n["Kontakt"], n["Adresa Prikupa"], n["Napomena"])
         except Exception as e:
             st.error(f"Greska pri spremanju: {e}")
 
-def azuriraj_status_naloga(id_naloga, novi_status, vrijeme_obrade="-"):
+def azuriraj_status_naloga(id_naloga, novi_status, vrijeme_obrade="-", stornirao="-"):
     if supabase:
         try:
-            supabase.table("nalozi").update({
+            podaci = {
                 "status": novi_status,
                 "vrijeme_obrade": vrijeme_obrade
-            }).eq("id", id_naloga).execute()
+            }
+            if stornirao != "-":
+                podaci["stornirao"] = stornirao
+            supabase.table("nalozi").update(podaci).eq("id", id_naloga).execute()
         except Exception:
             pass
 
@@ -152,6 +155,10 @@ if "user_role" not in st.session_state:
 
 if "ponovi_prikup_data" not in st.session_state:
     st.session_state.ponovi_prikup_data = None
+
+# Kontrola odabrane kartice (tab-a)
+if "active_tab" not in st.session_state:
+    st.session_state.active_tab = 0
 
 if "scanned_id" not in st.session_state:
     st.session_state.scanned_id = None
@@ -384,11 +391,13 @@ if st.session_state.user_role == "vozac":
 
     st.stop()
 
-# Dinamičko kreiranje kartica ovisno o ulozi
+# Definiranje kartica ovisno o ulozi
 if st.session_state.user_role == "admin":
-    tab1, tab2, tab3 = st.tabs(["✨ Unos Novog Naloga", "📊 Pregled & Upravljanje", "🧹 Čišćenje baze"])
+    tabs = st.tabs(["✨ Unos Novog Naloga", "📊 Pregled & Upravljanje", "🧹 Čišćenje baze"])
+    tab1, tab2, tab3 = tabs[0], tabs[1], tabs[2]
 else:
-    tab1, tab2 = st.tabs(["✨ Unos Novog Naloga", "📊 Pregled & Upravljanje"])
+    tabs = st.tabs(["✨ Unos Novog Naloga", "📊 Pregled & Upravljanje"])
+    tab1, tab2 = tabs[0], tabs[1]
 
 with tab1:
     st.subheader("Unos novog naloga")
@@ -436,7 +445,6 @@ with tab1:
             c1.markdown(f"**Tip:** {tip}")
             c2.markdown(f"**Podnositelj:** {komercijalist if komercijalist else '*(Nije upisan)*'}")
             
-            # ISPRAVLJENO: 1 radni dan umjesto 2 (ako je danas 27.8., prvu idući radni dan je 28.8.)
             if pp_data and pp_data.get("Datum Prikupa"):
                 try:
                     inicijalni_datum = datetime.strptime(pp_data.get("Datum Prikupa"), "%Y-%m-%d").date()
@@ -491,7 +499,8 @@ with tab1:
                         "Opis robe": opis,
                         "Napomena": napomena or "-",
                         "Status": "Na čekanju",
-                        "Vrijeme Obrade": "-"
+                        "Vrijeme Obrade": "-",
+                        "Stornirao": "-"
                     }
                     spremi_novi_nalog(novi_nalog)
                     st.session_state.baza_naloga = ucitaj_naloge()
@@ -629,6 +638,7 @@ with tab2:
 
         statusi_opcije = ["Na čekanju", "Isprintano", "Prikupljeno", "Storno"]
         is_admin = (st.session_state.user_role == "admin")
+        is_komercijala = (st.session_state.user_role == "komercijala")
 
         for i, nalog in enumerate(filtrirani):
             with st.container(border=True):
@@ -636,29 +646,44 @@ with tab2:
                 c1.markdown(f"**{nalog['ID Naloga']}**<br>Prikup: _{nalog['Datum Prikupa']}_<br><span style='font-size:0.75rem; color:gray;'>Kreirano: {nalog.get('Datum Kreiranja', '-')}</span>", unsafe_allow_html=True)
                 c2.markdown(f"👤 **{nalog['Komercijalist']}**")
                 c3.markdown(f"🏢 **{nalog['Dobavljac']}**<br>_{nalog['Adresa Prikupa']}_", unsafe_allow_html=True)
-                c4.markdown(f"**{nalog['Status']}**")
+                
+                status_tekst = f"**{nalog['Status']}**"
+                if nalog['Status'] == "Storno" and nalog.get('Stornirao') and nalog.get('Stornirao') != "-":
+                    status_tekst += f"<br><span style='font-size:0.7rem; color:#dc2626;'>Stornirao: {nalog['Stornirao']}</span>"
+                c4.markdown(status_tekst, unsafe_allow_html=True)
 
                 with c5:
                     if is_admin:
                         novi_status = st.selectbox("Status", statusi_opcije, index=statusi_opcije.index(nalog['Status']) if nalog['Status'] in statusi_opcije else 0, key=f"st_{nalog['ID Naloga']}_{i}", label_visibility="collapsed")
                         if novi_status != nalog['Status']:
                             vrijeme = f"{datetime.now().strftime('%d.%m.%Y. %H:%M')}" if novi_status == "Prikupljeno" else "-"
-                            azuriraj_status_log_naloga = azuriraj_status_naloga(nalog['ID Naloga'], novi_status, vrijeme)
+                            tko_storno = f"Admin ({datetime.now().strftime('%d.%m.%Y. %H:%M')})" if novi_status == "Storno" else "-"
+                            azuriraj_status_naloga(nalog['ID Naloga'], novi_status, vrijeme, tko_storno)
                             st.session_state.baza_naloga = ucitaj_naloge()
                             st.rerun()
                     else:
                         st.caption(f"Vrijeme obrade: {nalog['Vrijeme Obrade']}")
 
-                    sub_c1, sub_c2 = st.columns(2)
+                    sub_c1, sub_c2, sub_c3 = st.columns(3)
                     single_pdf = generiraj_pdf_makromikro([nalog]).getvalue()
-                    sub_c1.download_button("📄 PDF", single_pdf, file_name=f"Nalog_{nalog['ID Naloga']}.pdf", mime="application/pdf", key=f"p_{nalog['ID Naloga']}_{i}", use_container_width=True)
-                    if sub_c2.button("🔄 Ponovi", key=f"r_{nalog['ID Naloga']}_{i}", use_container_width=True):
+                    sub_c1.download_button("📄", single_pdf, file_name=f"Nalog_{nalog['ID Naloga']}.pdf", mime="application/pdf", key=f"p_{nalog['ID Naloga']}_{i}", use_container_width=True, help="Preuzmi PDF")
+                    
+                    if sub_c2.button("🔄", key=f"r_{nalog['ID Naloga']}_{i}", use_container_width=True, help="Ponovi nalog"):
                         st.session_state.ponovi_prikup_data = nalog
                         st.rerun()
 
-# 3. KARTICA: ČIŠĆENJE BAZE (Dostupno ISKLJUČIVO ADMINISTRATORU)
+                    if is_komercijala and nalog['Status'] != "Storno":
+                        if sub_c3.button("❌", key=f"storno_{nalog['ID Naloga']}_{i}", use_container_width=True, type="secondary", help="Storniraj nalog"):
+                            vrijeme_storna = datetime.now().strftime('%d.%m.%Y. %H:%M')
+                            tko_storno = f"Komercijala ({nalog['Komercijalist']}) - {vrijeme_storna}"
+                            azuriraj_status_naloga(nalog['ID Naloga'], "Storno", "-", tko_storno)
+                            st.session_state.baza_naloga = ucitaj_naloge()
+                            st.success(f"Nalog {nalog['ID Naloga']} uspješno storniran!")
+                            st.rerun()
+
+# Čišćenje baze (Admin Panel)
 if st.session_state.user_role == "admin":
-    with tab3:
+    with (tabs[2] if len(tabs) > 2 else tab3):
         st.subheader("🧹 Čišćenje i brisanje unosa (Admin Panel)")
         st.markdown("Ovdje možete slobodno obrisati unose komercijalista (i sve njihove pripadajuće naloge) ili suvišne dobavljače.")
         
