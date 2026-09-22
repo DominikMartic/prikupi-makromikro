@@ -172,6 +172,18 @@ if "selected_dob_idx" not in st.session_state:
 if "uspjeh_poruka" not in st.session_state:
     st.session_state.uspjeh_poruka = None
 
+if "reset_form_flag" not in st.session_state:
+    st.session_state.reset_form_flag = False
+
+# Provjera i izvršavanje reseta prije ispisivanja widgeta
+if st.session_state.reset_form_flag:
+    st.session_state["select_dob_main"] = "Novi dobavljac..."
+    st.session_state["select_tip_main"] = "Prikup"
+    st.session_state["select_kom_main"] = "Unesi novog..."
+    st.session_state["input_novi_kom"] = ""
+    st.session_state.selected_dob_idx = 0
+    st.session_state.reset_form_flag = False
+
 query_params = st.query_params
 if "role" in query_params:
     st.session_state.user_role = query_params.get("role")
@@ -527,15 +539,9 @@ if st.session_state.navigacija == "✨ Unos novog naloga":
                     st.session_state.baza_naloga = ucitaj_naloge()
                     st.session_state.baza_dobavljaca = ucitaj_dobavljace()
                     st.session_state.ponovi_prikup_data = None
-                    st.session_state.selected_dob_idx = 0
                     
-                    # Resetiranje vanjskih widgeta kako bi se forma u potpunosti očistila
-                    st.session_state["select_dob_main"] = "Novi dobavljac..."
-                    st.session_state["select_tip_main"] = "Prikup"
-                    st.session_state["select_kom_main"] = "Unesi novog..."
-                    if "input_novi_kom" in st.session_state:
-                        st.session_state["input_novi_kom"] = ""
-
+                    # Postavljanje zastavice za resetiranje widgeta na početku idućeg pokretanja
+                    st.session_state.reset_form_flag = True
                     st.session_state.uspjeh_poruka = f"Nalog {id_naloga} uspješno spremljen u bazu!"
                     st.rerun()
 
