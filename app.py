@@ -426,7 +426,6 @@ st.markdown("---")
 if st.session_state.navigacija == "✨ Unos novog naloga":
     st.subheader("Unos novog naloga")
 
-    # Prikaz poruke o uspjehu ako postoji u session state-u
     if st.session_state.uspjeh_poruka:
         st.success(st.session_state.uspjeh_poruka)
         st.session_state.uspjeh_poruka = None
@@ -461,11 +460,11 @@ if st.session_state.navigacija == "✨ Unos novog naloga":
 
     with st.container(border=True):
         ck1, ck2 = st.columns(2)
-        tip = ck1.selectbox("Tip dokumenta", ["Prikup", "Povrat"])
+        tip = ck1.selectbox("Tip dokumenta", ["Prikup", "Povrat"], key="select_tip_main")
         
-        kom_opcija = ck2.selectbox("Podnositelj zahtjeva (Odaberi ili unesi):", lista_komercijalista_opcije)
+        kom_opcija = ck2.selectbox("Podnositelj zahtjeva (Odaberi ili unesi):", lista_komercijalista_opcije, key="select_kom_main")
         if kom_opcija == "Unesi novog...":
-            komercijalist = st.text_input("Upišite ime novog podnositelja zahtjeva", value=pp_data.get("Komercijalist", "") if pp_data else "")
+            komercijalist = st.text_input("Upišite ime novog podnositelja zahtjeva", value=pp_data.get("Komercijalist", "") if pp_data else "", key="input_novi_kom")
         else:
             komercijalist = kom_opcija
 
@@ -529,6 +528,14 @@ if st.session_state.navigacija == "✨ Unos novog naloga":
                     st.session_state.baza_dobavljaca = ucitaj_dobavljace()
                     st.session_state.ponovi_prikup_data = None
                     st.session_state.selected_dob_idx = 0
+                    
+                    # Resetiranje vanjskih widgeta kako bi se forma u potpunosti očistila
+                    st.session_state["select_dob_main"] = "Novi dobavljac..."
+                    st.session_state["select_tip_main"] = "Prikup"
+                    st.session_state["select_kom_main"] = "Unesi novog..."
+                    if "input_novi_kom" in st.session_state:
+                        st.session_state["input_novi_kom"] = ""
+
                     st.session_state.uspjeh_poruka = f"Nalog {id_naloga} uspješno spremljen u bazu!"
                     st.rerun()
 
