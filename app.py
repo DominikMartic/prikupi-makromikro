@@ -163,6 +163,13 @@ if "ponovi_prikup_data" not in st.session_state:
 if "navigacija" not in st.session_state:
     st.session_state.navigacija = "✨ Unos novog naloga"
 
+if "prebaci_na_unos" not in st.session_state:
+    st.session_state.prebaci_na_unos = False
+
+if st.session_state.prebaci_na_unos:
+    st.session_state.navigacija = "✨ Unos novog naloga"
+    st.session_state.prebaci_na_unos = False
+
 if "scanned_id" not in st.session_state:
     st.session_state.scanned_id = None
 
@@ -418,7 +425,6 @@ if st.session_state.user_role == "admin":
 if st.session_state.navigacija not in opcije_navigacije:
     st.session_state.navigacija = opcije_navigacije[0]
 
-# Korištenje ključa "navigacija" direktno povezuje st.radio sa st.session_state.navigacija
 odabrana_navigacija = st.radio(
     "Navigacija", 
     opcije_navigacije, 
@@ -700,7 +706,7 @@ elif st.session_state.navigacija == "📊 Pregled & Upravljanje":
                     
                     if sub_c2.button("🔄", key=f"r_{nalog['ID Naloga']}_{i}", use_container_width=True, help="Ponovi nalog"):
                         st.session_state.ponovi_prikup_data = nalog
-                        st.session_state.navigacija = "✨ Unos novog naloga"
+                        st.session_state.prebaci_na_unos = True
                         st.rerun()
 
                     if is_komercijala and nalog['Status'] == "Na čekanju":
