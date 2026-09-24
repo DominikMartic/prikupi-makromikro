@@ -654,23 +654,25 @@ elif st.session_state.navigacija == "📊 Pregled & Upravljanje":
 
         st.markdown("---")
 
-        za_print = [x for x in filtrirani if x["Status"] == "Na čekanju"]
-        if za_print:
-            pdf_bytes = generiraj_pdf_makromikro(za_print).getvalue()
-            
-            download_clicked = st.download_button(
-                label=f"📄 Preuzmi PDF Zbirni Zahtjev ({len(za_print)} naloga)",
-                data=pdf_bytes,
-                file_name=f"Zahtjev_za_transport_{hrv_sada().strftime('%d-%m-%Y')}.pdf",
-                mime="application/pdf",
-                type="primary"
-            )
-            
-            if download_clicked:
-                for nalog_za_azuriranje in za_print:
-                    azuriraj_status_naloga(nalog_za_azuriranje["ID Naloga"], "Isprintano", "-")
-                st.session_state.baza_naloga = ucitaj_naloge()
-                st.rerun()
+        # OGRANIČENJE: Samo administrator smije vidjeti i preuzeti zbirnu PDF listu
+        if st.session_state.user_role == "admin":
+            za_print = [x for x in filtrirani if x["Status"] == "Na čekanju"]
+            if za_print:
+                pdf_bytes = generiraj_pdf_makromikro(za_print).getvalue()
+                
+                download_clicked = st.download_button(
+                    label=f"📄 Preuzmi PDF Zbirni Zahtjev ({len(za_print)} naloga)",
+                    data=pdf_bytes,
+                    file_name=f"Zahtjev_za_transport_{hrv_sada().strftime('%d-%m-%Y')}.pdf",
+                    mime="application/pdf",
+                    type="primary"
+                )
+                
+                if download_clicked:
+                    for nalog_za_azuriranje in za_print:
+                        azuriraj_status_naloga(nalog_za_azuriranje["ID Naloga"], "Isprintano", "-")
+                    st.session_state.baza_naloga = ucitaj_naloge()
+                    st.rerun()
 
         statusi_opcije = ["Na čekanju", "Isprintano", "Prikupljeno", "Storno"]
         is_admin = (st.session_state.user_role == "admin")
