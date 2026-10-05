@@ -333,7 +333,7 @@ if st.session_state.user_role == "vozac":
     st.caption("Uključite kameru za skeniranje QR koda ili upišite ID ručno:")
 
     with st.container(border=True):
-        # Stabilna HTML5 skener komponenta za kameru (radi na Renderu bez rušenja)
+        # HTML5 skener komponenta namještena na stražnju kameru (facingMode: environment)
         scanner_html = """
         <div id="reader" style="width: 100%; max-width: 400px; margin: auto;"></div>
         <script src="https://unpkg.com/html5-qrcode"></script>
@@ -344,7 +344,14 @@ if st.session_state.user_role == "vozac":
             window.parent.location.href = url.href;
           }
           let html5QrcodeScanner = new Html5QrcodeScanner(
-            "reader", { fps: 10, qrbox: { width: 250, height: 250 } }, false);
+            "reader", 
+            { 
+              fps: 10, 
+              qrbox: { width: 250, height: 250 },
+              facingMode: "environment" 
+            }, 
+            false
+          );
           html5QrcodeScanner.render(onScanSuccess);
         </script>
         """
