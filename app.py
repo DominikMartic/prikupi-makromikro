@@ -333,7 +333,7 @@ if st.session_state.user_role == "vozac":
     st.caption("Uključite kameru za skeniranje QR koda ili upišite ID ručno:")
 
     with st.container(border=True):
-        # HTML5 skener komponenta namještena na stražnju kameru (facingMode: environment)
+        # Pouzdana HTML5 komponenta za automatsko otvaranje stražnje kamere
         scanner_html = """
         <div id="reader" style="width: 100%; max-width: 400px; margin: auto;"></div>
         <script src="https://unpkg.com/html5-qrcode"></script>
@@ -343,19 +343,21 @@ if st.session_state.user_role == "vozac":
             url.searchParams.set('scanned_code', decodedText);
             window.parent.location.href = url.href;
           }
-          let html5QrcodeScanner = new Html5QrcodeScanner(
-            "reader", 
-            { 
-              fps: 10, 
-              qrbox: { width: 250, height: 250 },
-              facingMode: "environment" 
-            }, 
-            false
-          );
-          html5QrcodeScanner.render(onScanSuccess);
+
+          let html5QrCode = new Html5Qrcode("reader");
+          html5QrCode.start(
+            { facingMode: "environment" }, 
+            {
+              fps: 10,
+              qrbox: { width: 250, height: 250 }
+            },
+            onScanSuccess
+          ).catch((err) => {
+            console.error("Greška pri pokretanju kamere: ", err);
+          });
         </script>
         """
-        components.html(scanner_html, height=420)
+        components.html(scanner_html, height=450)
 
         rucni_unos = st.text_input("Ili ručno upišite ID naloga:", value=st.session_state.scanned_id or "", placeholder="Npr. PR-2026-001")
         
