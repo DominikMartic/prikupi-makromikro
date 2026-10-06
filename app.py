@@ -420,7 +420,7 @@ if st.session_state.user_role == "vozac":
 
 opcije_navigacije = ["✨ Unos novog naloga", "📊 Pregled & Upravljanje"]
 if st.session_state.user_role == "admin":
-    opcije_navigacije.append("🧹 Čišćenje baze")
+    opcije_navigacije.extend(["📊 Analitika dobavljača", "🧹 Čišćenje baze"])
 
 if st.session_state.navigacija not in opcije_navigacije:
     st.session_state.navigacija = opcije_navigacije[0]
@@ -654,7 +654,6 @@ elif st.session_state.navigacija == "📊 Pregled & Upravljanje":
 
         st.markdown("---")
 
-        # OGRANIČENJE: Samo administrator smije vidjeti i preuzeti zbirnu PDF listu
         if st.session_state.user_role == "admin":
             za_print = [x for x in filtrirani if x["Status"] == "Na čekanju"]
             if za_print:
@@ -719,6 +718,47 @@ elif st.session_state.navigacija == "📊 Pregled & Upravljanje":
                             st.session_state.baza_naloga = ucitaj_naloge()
                             st.success(f"Nalog {nalog['ID Naloga']} uspješno storniran!")
                             st.rerun()
+
+elif st.session_state.user_role == "admin" and st.session_state.navigacija == "📊 Analitika dobavljača":
+    st.subheader("📊 Vizualna i Excel analitika dobavljača (Od početka korištenja)")
+    st.markdown("Pregled učestalosti nabave/prikupa od pojedinih dobavljača od samog početka korištenja aplikacije.")
+
+    if not st.session_state.baza_naloga:
+        st.info("Nema podataka u bazi naloga.")
+    else:
+        df_nalozi = pd.DataFrame(st.session_state.baza_naloga)
+        if "Dobavljac" in df_nalozi.columns:
+            df_aktivni = df_nalozi[df_nalozi["Status"] != "Storno"]
+            
+            freq_df = df_aktivni["Dobavljac"].value_counts().reset_index()
+            freq_df.columns = ["Dobavljač", "Broj kupnji / naloga"]
+            freq_df = freq_df.sort_values(by="Broj kupnji / naloga", ascending=False).reset_index(drop=True)
+
+            col_met1, col_met2 = st.columns(2)
+            col_met1.metric("Ukupno dobavljača", len(freq_df))
+            col_met2.metric("Ukupno naloga (bez storna)", len(df_aktivni))
+
+            st.markdown("---")
+            st.markdown("### 📈 Vizualni prikaz učestalosti dobavljača")
+            
+            if not freq_df.empty:
+                chart_data = freq_df.set_index("Dobavljač")
+                st.bar_chart(chart_data)
+
+                st.markdown("### 📋 Tablični pregled i Excel izvoz")
+                st.dataframe(freq_df, use_container_width=True)
+
+                csv_dobavljaci = freq_df.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 Preuzmi Excel / CSV izvještaj učestalosti dobavljača",
+                    data=csv_dobavljaci,
+                    file_name=f"Makromikro_Ucestalost_Dobavljaca_{hrv_sada().strftime('%d-%m-%Y')}.csv",
+                    mime="text/csv",
+                    type="primary",
+                    use_container_width=True
+                )
+            else:
+                st.warning("Nema aktivnih naloga za analizu dobavljača.")
 
 elif st.session_state.user_role == "admin" and st.session_state.navigacija == "🧹 Čišćenje baze":
     st.subheader("🧹 Čišćenje i brisanje unosa (Admin Panel)")
