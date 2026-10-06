@@ -3,3 +3,4 @@ pandas
 reportlab
 qrcode
 supabase
+streamlit-qrcode-scanner
