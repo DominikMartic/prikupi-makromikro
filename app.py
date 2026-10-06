@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -8,6 +7,7 @@ import html
 import os
 import qrcode
 from supabase import create_client, Client
+from streamlit_qrcode_scanner import qrcode_scanner
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
@@ -195,8 +195,6 @@ if "role" in query_params:
     st.session_state.user_role = query_params.get("role")
 if "search" in query_params:
     st.session_state.scanned_id = query_params.get("search")
-if "scanned_code" in query_params:
-    st.session_state.scanned_id = query_params.get("scanned_code")
 
 st.markdown("""
     <style>
@@ -330,38 +328,13 @@ def generiraj_pdf_makromikro(nalozi_list):
 
 if st.session_state.user_role == "vozac":
     st.subheader("🚚 Terenski Mod - Skeniranje i Preuzimanje Naloga")
-    st.caption("Uključite kameru za skeniranje QR koda ili upišite ID ručno:")
+    st.caption("Uključite kameru za skeniraje QR koda ili upišite ID ručno:")
 
     with st.container(border=True):
-        # Pouzdana HTML5 komponenta za automatsko otvaranje stražnje kamere
-        scanner_html = """
-        <div id="reader" style="width: 100%; max-width: 400px; margin: auto;"></div>
-        <script src="https://unpkg.com/html5-qrcode"></script>
-        <script>
-          function onScanSuccess(decodedText, decodedResult) {
-            const url = new URL(window.parent.location.href);
-            url.searchParams.set('scanned_code', decodedText);
-            window.parent.location.href = url.href;
-          }
-
-          let html5QrCode = new Html5Qrcode("reader");
-          html5QrCode.start(
-            { facingMode: "environment" }, 
-            {
-              fps: 10,
-              qrbox: { width: 250, height: 250 }
-            },
-            onScanSuccess
-          ).catch((err) => {
-            console.error("Greška pri pokretanju kamere: ", err);
-          });
-        </script>
-        """
-        components.html(scanner_html, height=450)
-
+        qr_code_skeniran = qrcode_scanner(key="qr_scanner")
         rucni_unos = st.text_input("Ili ručno upišite ID naloga:", value=st.session_state.scanned_id or "", placeholder="Npr. PR-2026-001")
         
-        active_input = rucni_unos
+        active_input = qr_code_skeniran if qr_code_skeniran else rucni_unos
         
         col_s1, _ = st.columns(2)
         
@@ -445,7 +418,6 @@ if st.session_state.user_role == "vozac":
 
     st.stop()
 
-# ----------------- NAVIGACIJA ZA ADMIN / KOMERCIJALU -----------------
 opcije_navigacije = ["✨ Unos novog naloga", "📊 Pregled & Upravljanje"]
 if st.session_state.user_role == "admin":
     opcije_navigacije.append("🧹 Čišćenje baze")
@@ -682,6 +654,7 @@ elif st.session_state.navigacija == "📊 Pregled & Upravljanje":
 
         st.markdown("---")
 
+        # OGRANIČENJE: Samo administrator smije vidjeti i preuzeti zbirnu PDF listu
         if st.session_state.user_role == "admin":
             za_print = [x for x in filtrirani if x["Status"] == "Na čekanju"]
             if za_print:
@@ -765,8 +738,5 @@ elif st.session_state.user_role == "admin" and st.session_state.navigacija == "�
                         supabase.table("nalozi").delete().eq("komercijalist", kom_za_brisanje).execute()
                         st.session_state.baza_naloga = ucitaj_naloge()
                         st.success(f"Uspješno obrisan komercijalist i svi njegovi unosi: {kom_za_brisanje}")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Greška prilikom brisanja: {e}")
-        else:
-            st.info("Nema unesenih komercijalista u bazi.")
+                    except Exception:
+                        pass
