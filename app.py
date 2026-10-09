@@ -734,9 +734,17 @@ elif st.session_state.user_role == "admin" and st.session_state.navigacija == "�
             freq_df.columns = ["Dobavljač", "Broj kupnji / naloga"]
             freq_df = freq_df.sort_values(by="Broj kupnji / naloga", ascending=False).reset_index(drop=True)
 
-            col_met1, col_met2 = st.columns(2)
+            if "Datum Prikupa" in df_aktivni.columns:
+                dnevni_prikupi = df_aktivni["Datum Prikupa"].value_counts().reset_index()
+                dnevni_prikupi.columns = ["Datum", "Broj prikupa"]
+                prosjek_dnevno = round(dnevni_prikupi["Broj prikupa"].mean()) if not dnevni_prikupi.empty else 0
+            else:
+                prosjek_dnevno = 0
+
+            col_met1, col_met2, col_met3 = st.columns(3)
             col_met1.metric("Ukupno dobavljača", len(freq_df))
             col_met2.metric("Ukupno naloga (bez storna)", len(df_aktivni))
+            col_met3.metric("Prosjek prikupa po danu", f"{prosjek_dnevno} naloga")
 
             st.markdown("---")
             st.markdown("### 📈 Vizualni prikaz učestalosti dobavljača")
@@ -744,6 +752,11 @@ elif st.session_state.user_role == "admin" and st.session_state.navigacija == "�
             if not freq_df.empty:
                 chart_data = freq_df.set_index("Dobavljač")
                 st.bar_chart(chart_data)
+
+                st.markdown("### 📈 Vizualni prikaz prikupa po danima")
+                if not dnevni_prikupi.empty:
+                    chart_dnevni = dnevni_prikupi.sort_values("Datum").set_index("Datum")
+                    st.bar_chart(chart_dnevni)
 
                 st.markdown("### 📋 Tablični pregled i Excel izvoz")
                 st.dataframe(freq_df, use_container_width=True)
