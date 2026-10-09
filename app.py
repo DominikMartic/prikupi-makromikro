@@ -735,16 +735,28 @@ elif st.session_state.user_role == "admin" and st.session_state.navigacija == "�
             freq_df = freq_df.sort_values(by="Broj kupnji / naloga", ascending=False).reset_index(drop=True)
 
             if "Datum Prikupa" in df_aktivni.columns:
-                dnevni_prikupi = df_aktivni["Datum Prikupa"].value_counts().reset_index()
+                df_temp = df_aktivni.copy()
+                df_temp["Datum_dt"] = pd.to_datetime(df_temp["Datum Prikupa"], errors="coerce")
+                # Filtriraj samo radne dane (ponedjeljak-petak: weekday < 5)
+                df_radni = df_temp[df_temp["Datum_dt"].dt.weekday < 5]
+                
+                dnevni_prikupi = df_radni["Datum Prikupa"].value_counts().reset_index()
                 dnevni_prikupi.columns = ["Datum", "Broj prikupa"]
-                prosjek_dnevno = round(dnevni_prikupi["Broj prikupa"].mean()) if not dnevni_prikupi.empty else 0
+                
+                if not dnevni_prikupi.empty:
+                    ukupno_radni_nalozi = len(df_radni)
+                    broj_radnih_dana = df_radni["Datum Prikupa"].nunique()
+                    prosjek_dnevno = round(ukupno_radni_nalozi / broj_radnih_dana) if broj_radnih_dana > 0 else 0
+                else:
+                    prosjek_dnevno = 0
             else:
+                dnevni_prikupi = pd.DataFrame(columns=["Datum", "Broj prikupa"])
                 prosjek_dnevno = 0
 
             col_met1, col_met2, col_met3 = st.columns(3)
             col_met1.metric("Ukupno dobavljača", len(freq_df))
             col_met2.metric("Ukupno naloga (bez storna)", len(df_aktivni))
-            col_met3.metric("Prosjek prikupa po danu", f"{prosjek_dnevno} naloga")
+            col_met3.metric("Prosjek prikupa / radni dan", f"{prosjek_dnevno} naloga")
 
             st.markdown("---")
             st.markdown("### 📈 Vizualni prikaz učestalosti dobavljača")
@@ -753,7 +765,7 @@ elif st.session_state.user_role == "admin" and st.session_state.navigacija == "�
                 chart_data = freq_df.set_index("Dobavljač")
                 st.bar_chart(chart_data)
 
-                st.markdown("### 📈 Vizualni prikaz prikupa po danima")
+                st.markdown("### 📈 Vizualni prikaz prikupa po radnim danima")
                 if not dnevni_prikupi.empty:
                     chart_dnevni = dnevni_prikupi.sort_values("Datum").set_index("Datum")
                     st.bar_chart(chart_dnevni)
