@@ -777,5 +777,31 @@ elif st.session_state.user_role == "admin" and st.session_state.navigacija == "�
                 st.download_button(
                     label="📥 Preuzmi Excel / CSV izvještaj učestalosti dobavljača",
                     data=csv_dobavljaci,
-                 
-                        
+                    file_name=f"Makromikro_Ucestalost_Dobavljaca_{hrv_sada().strftime('%d-%m-%Y')}.csv",
+                    mime="text/csv",
+                    type="primary",
+                    use_container_width=True
+                )
+            else:
+                st.warning("Nema aktivnih naloga za analizu dobavljača.")
+
+elif st.session_state.user_role == "admin" and st.session_state.navigacija == "🧹 Čišćenje baze":
+    st.subheader("🧹 Čišćenje i brisanje unosa (Admin Panel)")
+    st.markdown("Ovdje možete slobodno obrisati unose komercijalista (i sve njihove pripadajuće naloge) ili suvišne dobavljače.")
+    
+    with st.container(border=True):
+        st.markdown("#### 👤 Brisanje komercijalista i njegovih naloga")
+        svi_kom_baza = sorted(list(set(n["Komercijalist"] for n in st.session_state.baza_naloga if n["Komercijalist"])))
+        
+        if svi_kom_baza:
+            col_k1, col_k2 = st.columns([2, 1])
+            kom_za_brisanje = col_k1.selectbox("Odaberi komercijalista:", svi_kom_baza, key="open_sel_kom_del")
+            
+            if col_k2.button("🗑️ Obriši komercijalista i naloge", type="secondary", use_container_width=True):
+                if supabase and kom_za_brisanje:
+                    try:
+                        supabase.table("nalozi").delete().eq("komercijalist", kom_za_brisanje).execute()
+                        st.session_state.baza_naloga = ucitaj_naloge()
+                        st.success(f"Uspješno obrisan komercijalist i svi njegovi unosi: {kom_za_brisanje}")
+                    except Exception:
+                        pass
