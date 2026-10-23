@@ -804,4 +804,4 @@ elif st.session_state.user_role == "admin" and st.session_state.navigacija == "ð
                         st.session_state.baza_naloga = ucitaj_naloge()
                         st.success(f"UspjeÅ¡no obrisan komercijalist i svi njegovi unosi: {kom_za_brisanje}")
                     except Exception:
-                        pass
+                        
