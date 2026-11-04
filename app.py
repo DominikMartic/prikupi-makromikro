@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
@@ -237,7 +236,6 @@ def clean_txt(text):
     return html.escape(str(text)).replace('\n', '<br/>')
 
 def generiraj_qr_sliku(sadrzaj):
-    # Visoka rezolucija i oštrina QR koda za pouzdaniji ispis na A4
     qr = qrcode.QRCode(box_size=6, border=1)
     qr.add_data(sadrzaj)
     qr.make(fit=True)
@@ -276,7 +274,6 @@ def generiraj_pdf_makromikro(nalozi_list):
         
         try:
             qr_buf = generiraj_qr_sliku(str(n['ID Naloga']))
-            # Povećan QR kod na 90x90 piksela u dokumentu
             qr_img = Image(qr_buf, width=90, height=90)
             qr_img.hAlign = 'RIGHT'
         except Exception:
@@ -343,15 +340,12 @@ if st.session_state.user_role == "vozac":
                 file_bytes = np.asarray(bytearray(slika_qr.read()), dtype=np.uint8)
                 opencv_image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
                 
-                # Pretvorba u sivi ton i ekvalizacija kontrasta za bolju detekciju na terenu
                 siva_slika = cv2.cvtColor(opencv_image, cv2.COLOR_BGR2GRAY)
                 siva_slika = cv2.equalizeHist(siva_slika)
                 
                 qr_detector = cv2.QRCodeDetector()
-                # 1. Primarni pokušaj na obrađenoj sivoj slici
                 data, bbox, straight_qrcode = qr_detector.detectAndDecode(siva_slika)
                 
-                # 2. Rezervni pokušaj na originalnoj slici
                 if not data:
                     data, bbox, straight_qrcode = qr_detector.detectAndDecode(opencv_image)
 
@@ -367,8 +361,6 @@ if st.session_state.user_role == "vozac":
         
         active_input = skenirani_id_iz_slike if skenirani_id_iz_slike else rucni_unos
         
-        col_s1, _ = st.columns(2)
-        
         if active_input:
             skid = active_input.strip()
             postojeci_nalog = next((x for x in st.session_state.baza_naloga if x["ID Naloga"].lower() == skid.lower()), None)
@@ -376,15 +368,23 @@ if st.session_state.user_role == "vozac":
             if postojeci_nalog:
                 st.info(f"Pronađen nalog: **{postojeci_nalog['ID Naloga']}** ({postojeci_nalog['Dobavljac']})")
                 if postojeci_nalog['Status'] != "Prikupljeno":
-                    if col_s1.button("🚀 Automatski prebaci u PREUZETO", type="primary", use_container_width=True):
-                        vrijeme_sada = hrv_sada().strftime('%d.%m.%Y. %H:%M')
-                        azuriraj_status_naloga(postojeci_nalog['ID Naloga'], "Prikupljeno", vrijeme_sada)
-                        st.session_state.baza_naloga = ucitaj_naloge()
-                        st.session_state.scanned_id = ""
-                        st.success(f"Nalog {postojeci_nalog['ID Naloga']} uspješno označen kao preuzet!")
-                        st.rerun()
+                    st.markdown("---")
+                    st.markdown("##### ✍️ Potvrda preuzimanja (Obavezan unos imena vozača)")
+                    ime_vozaca = st.text_input("Ime i prezime vozača:", placeholder="Unesite vaše ime i prezime...", key="input_ime_vozaca_teret")
+                    
+                    if st.button("✅ OZNAČI KAO PREUZETO", type="primary", use_container_width=True):
+                        if not ime_vozaca or not ime_vozaca.strip():
+                            st.error("❌ Greška: Morate upisati ime i prezime vozača kako biste mogli označiti nalog kao preuzet!")
+                        else:
+                            vrijeme_sada = hrv_sada().strftime('%d.%m.%Y. %H:%M')
+                            tko_preuzeo = f"Vozač: {ime_vozaca.strip()} ({vrijeme_sada})"
+                            azuriraj_status_naloga(postojeci_nalog['ID Naloga'], "Prikupljeno", tko_preuzeo)
+                            st.session_state.baza_naloga = ucitaj_naloge()
+                            st.session_state.scanned_id = ""
+                            st.success(f"Nalog {postojeci_nalog['ID Naloga']} uspješno označen kao preuzet od strane vozača: {ime_vozaca.strip()}!")
+                            st.rerun()
                 else:
-                    col_s1.warning("Nalog je već označen kao preuzet.")
+                    st.warning(f"Nalog je već označen kao preuzet. Vrijeme/Izvršitelj: {postojeci_nalog['Vrijeme Obrade']}")
 
     search_query = active_input
     filtrirani = st.session_state.baza_naloga
@@ -408,15 +408,21 @@ if st.session_state.user_role == "vozac":
                 st.markdown(f"📌 **Napomena:** {nalog['Napomena']}")
                 
                 if nalog['Status'] == "Prikupljeno":
-                    st.success(f"✅ Status: PREUZETO dana {nalog['Vrijeme Obrade']}")
+                    st.success(f"✅ Status: PREUZETO — {nalog['Vrijeme Obrade']}")
                 else:
                     st.info(f"⏳ Trenutni status: {nalog['Status']}")
+                    st.markdown("---")
+                    ime_vozaca_kartica = st.text_input("Ime i prezime vozača:", placeholder="Unesite vaše ime i prezime...", key=f"vozac_ kartica_{nalog['ID Naloga']}_{i}")
                     if st.button(f"✅ OZNAČI KAO PREUZETO ({nalog['ID Naloga']})", key=f"btn_prev_{nalog['ID Naloga']}_{i}", type="primary", use_container_width=True):
-                        vrijeme_sada = hrv_sada().strftime('%d.%m.%Y. %H:%M')
-                        azuriraj_status_naloga(nalog['ID Naloga'], "Prikupljeno", vrijeme_sada)
-                        st.session_state.baza_naloga = ucitaj_naloge()
-                        st.success("Uspješno označeno kao preuzeto!")
-                        st.rerun()
+                        if not ime_vozaca_kartica or not ime_vozaca_kartica.strip():
+                            st.error("❌ Greška: Morate upisati ime i prezime vozača da se nalog može prebaciti u preuzeto!")
+                        else:
+                            vrijeme_sada = hrv_sada().strftime('%d.%m.%Y. %H:%M')
+                            tko_preuzeo = f"Vozač: {ime_vozaca_kartica.strip()} ({vrijeme_sada})"
+                            azuriraj_status_naloga(nalog['ID Naloga'], "Prikupljeno", tko_preuzeo)
+                            st.session_state.baza_naloga = ucitaj_naloge()
+                            st.success(f"Uspješno označeno kao preuzeto od strane vozača: {ime_vozaca_kartica.strip()}!")
+                            st.rerun()
 
     st.markdown("<br><br><br>", unsafe_allow_html=True)
     with st.container(border=True):
@@ -724,7 +730,7 @@ elif st.session_state.navigacija == "📊 Pregled & Upravljanje":
                     if is_admin:
                         novi_status = st.selectbox("Status", statusi_opcije, index=statusi_opcije.index(nalog['Status']) if nalog['Status'] in statusi_opcije else 0, key=f"st_{nalog['ID Naloga']}_{i}", label_visibility="collapsed")
                         if novi_status != nalog['Status']:
-                            vrijeme = f"{hrv_sada().strftime('%d.%m.%Y. %H:%M')}" if novi_status == "Prikupljeno" else "-"
+                            vrijeme = f"Admin (ručno) — {hrv_sada().strftime('%d.%m.%Y. %H:%M')}" if novi_status == "Prikupljeno" else "-"
                             tko_storno = f"Admin ({hrv_sada().strftime('%d.%m.%Y. %H:%M')})" if novi_status == "Storno" else "-"
                             azuriraj_status_naloga(nalog['ID Naloga'], novi_status, vrijeme, tko_storno)
                             st.session_state.baza_naloga = ucitaj_naloge()
