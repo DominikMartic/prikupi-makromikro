@@ -146,8 +146,8 @@ def azuriraj_status_naloga(id_naloga, novi_status, vrijeme_obrade="-", stornirao
             if stornirao != "-":
                 podaci["stornirao"] = stornirao
             supabase.table("nalozi").update(podaci).eq("id", id_naloga).execute()
-        except Exception:
-            pass
+        except Exception as e:
+            st.error(f"Greška pri ažuriranju u bazi: {e}")
 
 if "baza_naloga" not in st.session_state:
     st.session_state.baza_naloga = ucitaj_naloge()
@@ -330,7 +330,6 @@ def generiraj_pdf_makromikro(nalozi_list):
     buffer.seek(0)
     return buffer
 
-# POPIS VOZAČA
 POPIS_VOZACA = [
     "Odaberite vozača...",
     "Dominik Martić",
@@ -394,10 +393,11 @@ if st.session_state.user_role == "vozac":
         
         if active_input:
             skid = active_input.strip()
+            st.session_state.baza_naloga = ucitaj_naloge()
             postojeci_nalog = next((x for x in st.session_state.baza_naloga if x["ID Naloga"].lower() == skid.lower()), None)
             
             if postojeci_nalog:
-                st.info(f"Pronađen nalog: **{postojeci_nalog['ID Naloga']}** ({postojeci_nalog['Dobavljac']})")
+                st.info(f"Pronađen nalog: **{postojeci_nalog['ID Naloga']}** ({postojeci_nalog['Dobavljac']}) — Status: **{postojeci_nalog['Status']}**")
                 if postojeci_nalog['Status'] != "Prikupljeno":
                     st.markdown("---")
                     if st.button("✅ OZNAČI KAO PREUZETO", type="primary", use_container_width=True):
@@ -609,6 +609,7 @@ if st.session_state.navigacija == "✨ Unos novog naloga":
                     st.rerun()
 
 elif st.session_state.navigacija == "📊 Pregled & Upravljanje":
+    st.session_state.baza_naloga = ucitaj_naloge()
     col_h1, col_h2 = st.columns([3, 1])
     col_h1.subheader("📋 Pregled & Upravljanje nalozima")
     if col_h2.button("🔄 Osvježi", use_container_width=True):
@@ -750,9 +751,9 @@ elif st.session_state.navigacija == "📊 Pregled & Upravljanje":
                 
                 status_tekst = f"**{nalog['Status']}**"
                 if nalog['Status'] == "Prikupljeno" and nalog.get('Vrijeme Obrade') and nalog.get('Vrijeme Obrade') != "-":
-                    status_tekst += f"<br><span style='font-size:0.7rem; color:#16a34a;'>{nalog['Vrijeme Obrade']}</span>"
+                    status_tekst += f"<br><span style='font-size:0.75rem; color:#16a34a; font-weight:bold;'>{nalog['Vrijeme Obrade']}</span>"
                 if nalog['Status'] == "Storno" and nalog.get('Stornirao') and nalog.get('Stornirao') != "-":
-                    status_tekst += f"<br><span style='font-size:0.7rem; color:#dc2626;'>Stornirao: {nalog['Stornirao']}</span>"
+                    status_tekst += f"<br><span style='font-size:0.75rem; color:#dc2626;'>Stornirao: {nalog['Stornirao']}</span>"
                 c4.markdown(status_tekst, unsafe_allow_html=True)
 
                 with c5:
@@ -765,7 +766,7 @@ elif st.session_state.navigacija == "📊 Pregled & Upravljanje":
                             st.session_state.baza_naloga = ucitaj_naloge()
                             st.rerun()
                     else:
-                        st.caption(f"Vrijeme obrade: {nalog['Vrijeme Obrade']}")
+                        st.caption(f"Vrijeme/Izvršitelj: {nalog['Vrijeme Obrade']}")
 
                     sub_c1, sub_c2, sub_c3 = st.columns(3)
                     single_pdf = generiraj_pdf_makromikro([nalog]).getvalue()
