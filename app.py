@@ -484,7 +484,7 @@ if st.session_state.user_role == "vozac":
 
 opcije_navigacije = ["✨ Unos novog naloga", "📊 Pregled & Upravljanje"]
 if st.session_state.user_role == "admin":
-    opcije_navigacije.extend(["📊 Analitika dobavljača", "🧹 Čišćenje baze"])
+    opcije_navigacije.extend(["📊 Analitika dobavljača", "🚚 Učinak vozača", "🧹 Čišćenje baze"])
 
 if st.session_state.navigacija not in opcije_navigacije:
     st.session_state.navigacija = opcije_navigacije[0]
@@ -850,6 +850,72 @@ elif st.session_state.user_role == "admin" and st.session_state.navigacija == "�
                 )
             else:
                 st.warning("Nema aktivnih naloga za analizu dobavljača.")
+
+elif st.session_state.user_role == "admin" and st.session_state.navigacija == "🚚 Učinak vozača":
+    st.subheader("🚚 Dnevni izvještaj učinka vozača")
+    st.markdown("Pregled broja uspješno obavljenih prikupa po pojedinom vozaču i po danima.")
+
+    if not st.session_state.baza_naloga:
+        st.info("Nema podataka u bazi naloga.")
+    else:
+        df_vozaci = pd.DataFrame(st.session_state.baza_naloga)
+        # Filtriramo samo prikupljene naloge koje su odradili vozači
+        df_prikupljeno = df_vozaci[(df_vozaci["Status"] == "Prikupljeno") & (df_vozaci["Vrijeme Obrade"].str.contains("Vozač:"))].copy()
+        
+        if df_prikupljeno.empty:
+            st.warning("Još nema evidentiranih prikupa od strane vozača u bazi.")
+        else:
+            # Ekstrahiramo ime vozača i datum iz stringa "Vozač: Ime (DD.MM.YYYY. HH:MM)"
+            import re
+            
+            zapisani_vozaci = []
+            zapisani_datumi = []
+            
+            for index, row in df_prikupljeno.iterrows():
+                v_obrade = str(row["Vrijeme Obrade"])
+                # Tražimo ime vozača između "Vozač: " i " ("
+                match_vozac = re.search(r"Vozač:\s*(.*?)\s*\(", v_obrade)
+                # Tražimo datum u formatu DD.MM.YYYY
+                match_datum = re.search(r"(\d{2}\.\d{2}\.\d{4})", v_obrade)
+                
+                if match_vozac and match_datum:
+                    zapisani_vozaci.append(match_vozac.group(1))
+                    zapisani_datumi.append(match_datum.group(1))
+                else:
+                    zapisani_vozaci.append("Nepoznato")
+                    zapisani_datumi.append("Nepoznato")
+            
+            df_prikupljeno["Vozač_Ime"] = zapisani_vozaci
+            df_prikupljeno["Datum_Preuzimanja"] = zapisani_datumi
+            
+            # Grupiramo po datumu i vozaču
+            df_pivot = df_prikupljeno.pivot_table(
+                index="Datum_Preuzimanja",
+                columns="Vozač_Ime",
+                values="ID Naloga",
+                aggfunc="count",
+                fill_value=0
+            ).reset_index()
+            
+            st.markdown("### 📊 Matrica učinka (Broj prikupa po danima i vozačima)")
+            st.dataframe(df_pivot, use_container_width=True)
+            
+            # Grafikon ukupnog učinka po vozačima
+            st.markdown("### 📈 Ukupan broj obavljenih prikupa po vozaču")
+            df_ukupno_vozac = df_prikupljeno["Vozač_Ime"].value_counts().reset_index()
+            df_ukupno_vozac.columns = ["Vozač", "Ukupno prikupa"]
+            st.bar_chart(df_ukupno_vozac.set_index("Vozač"))
+            
+            # Preuzimanje izvještaja
+            csv_ucinak = df_pivot.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Preuzmi Dnevni izvještaj učinka vozača (CSV)",
+                data=csv_ucinak,
+                file_name=f"Makromikro_Ucinak_Vozaca_{hrv_sada().strftime('%d-%m-%Y')}.csv",
+                mime="text/csv",
+                type="primary",
+                use_container_width=True
+            )
 
 elif st.session_state.user_role == "admin" and st.session_state.navigacija == "🧹 Čišćenje baze":
     st.subheader("🧹 Čišćenje i brisanje unosa (Admin Panel)")
