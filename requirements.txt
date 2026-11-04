@@ -3,4 +3,5 @@ pandas
 reportlab
 qrcode
 supabase
-streamlit-qrcode-scanner
+opencv-python-headless
+numpy
