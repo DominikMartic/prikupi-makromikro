@@ -158,6 +158,9 @@ if "baza_dobavljaca" not in st.session_state:
 if "user_role" not in st.session_state:
     st.session_state.user_role = "vozac"
 
+if "trenutni_vozac" not in st.session_state:
+    st.session_state.trenutni_vozac = "Odaberite vozača..."
+
 if "ponovi_prikup_data" not in st.session_state:
     st.session_state.ponovi_prikup_data = None
 
@@ -327,8 +330,36 @@ def generiraj_pdf_makromikro(nalozi_list):
     buffer.seek(0)
     return buffer
 
+# POPIS VOZAČA
+POPIS_VOZACA = [
+    "Odaberite vozača...",
+    "Dominik Martić",
+    "Nikolina Romić",
+    "Tomislav Vojvoda",
+    "Tomislav Orlovac",
+    "Dario Koprivnjak",
+    "Dalibor Franjić",
+    "Hrvoje Lekšić",
+    "Karlo Grđan",
+    "Dražen Lukačević",
+    "Nikola Bajac",
+    "Mladen Samardžić"
+]
+
 if st.session_state.user_role == "vozac":
     st.subheader("🚚 Terenski Mod - Skeniranje i Preuzimanje Naloga")
+
+    with st.container(border=True):
+        st.markdown("##### 👤 Prijavljeni vozač")
+        idx_v = POPIS_VOZACA.index(st.session_state.trenutni_vozac) if st.session_state.trenutni_vozac in POPIS_VOZACA else 0
+        odabrani_vozac = st.selectbox("Odaberite svoje ime s popisa:", POPIS_VOZACA, index=idx_v, key="select_vozac_prijava")
+        st.session_state.trenutni_vozac = odabrani_vozac
+        
+        if odabrani_vozac != "Odaberite vozača...":
+            st.success(f"Prijavljeni vozač: **{odabrani_vozac}** (Ime je zapamćeno za sva preuzimanja).")
+        else:
+            st.warning("⚠️ Molimo odaberite svoje ime s popisa kako biste mogli preuzimati naloge.")
+
     st.caption("Uslikajte QR kod kamerom mobitela ili upišite ID ručno:")
 
     with st.container(border=True):
@@ -369,22 +400,19 @@ if st.session_state.user_role == "vozac":
                 st.info(f"Pronađen nalog: **{postojeci_nalog['ID Naloga']}** ({postojeci_nalog['Dobavljac']})")
                 if postojeci_nalog['Status'] != "Prikupljeno":
                     st.markdown("---")
-                    st.markdown("##### ✍️ Potvrda preuzimanja (Obavezan unos imena vozača)")
-                    ime_vozaca = st.text_input("Ime i prezime vozača:", placeholder="Unesite vaše ime i prezime...", key="input_ime_vozaca_teret")
-                    
                     if st.button("✅ OZNAČI KAO PREUZETO", type="primary", use_container_width=True):
-                        if not ime_vozaca or not ime_vozaca.strip():
-                            st.error("❌ Greška: Morate upisati ime i prezime vozača kako biste mogli označiti nalog kao preuzet!")
+                        if st.session_state.trenutni_vozac == "Odaberite vozača...":
+                            st.error("❌ Greška: Morate odabrati svoje ime s popisa na vrhu stranice prije preuzimanja naloga!")
                         else:
                             vrijeme_sada = hrv_sada().strftime('%d.%m.%Y. %H:%M')
-                            tko_preuzeo = f"Vozač: {ime_vozaca.strip()} ({vrijeme_sada})"
+                            tko_preuzeo = f"Vozač: {st.session_state.trenutni_vozac} ({vrijeme_sada})"
                             azuriraj_status_naloga(postojeci_nalog['ID Naloga'], "Prikupljeno", tko_preuzeo)
                             st.session_state.baza_naloga = ucitaj_naloge()
                             st.session_state.scanned_id = ""
-                            st.success(f"Nalog {postojeci_nalog['ID Naloga']} uspješno označen kao preuzet od strane vozača: {ime_vozaca.strip()}!")
+                            st.success(f"Nalog {postojeci_nalog['ID Naloga']} uspješno označen kao preuzet od strane: {st.session_state.trenutni_vozac}!")
                             st.rerun()
                 else:
-                    st.warning(f"Nalog je već označen kao preuzet. Vrijeme/Izvršitelj: {postojeci_nalog['Vrijeme Obrade']}")
+                    st.warning(f"Nalog je već označen kao preuzet. Izvješće: {postojeci_nalog['Vrijeme Obrade']}")
 
     search_query = active_input
     filtrirani = st.session_state.baza_naloga
@@ -412,16 +440,15 @@ if st.session_state.user_role == "vozac":
                 else:
                     st.info(f"⏳ Trenutni status: {nalog['Status']}")
                     st.markdown("---")
-                    ime_vozaca_kartica = st.text_input("Ime i prezime vozača:", placeholder="Unesite vaše ime i prezime...", key=f"vozac_ kartica_{nalog['ID Naloga']}_{i}")
                     if st.button(f"✅ OZNAČI KAO PREUZETO ({nalog['ID Naloga']})", key=f"btn_prev_{nalog['ID Naloga']}_{i}", type="primary", use_container_width=True):
-                        if not ime_vozaca_kartica or not ime_vozaca_kartica.strip():
-                            st.error("❌ Greška: Morate upisati ime i prezime vozača da se nalog može prebaciti u preuzeto!")
+                        if st.session_state.trenutni_vozac == "Odaberite vozača...":
+                            st.error("❌ Greška: Morate odabrati svoje ime s popisa na vrhu stranice da se nalog može prebaciti u preuzeto!")
                         else:
                             vrijeme_sada = hrv_sada().strftime('%d.%m.%Y. %H:%M')
-                            tko_preuzeo = f"Vozač: {ime_vozaca_kartica.strip()} ({vrijeme_sada})"
+                            tko_preuzeo = f"Vozač: {st.session_state.trenutni_vozac} ({vrijeme_sada})"
                             azuriraj_status_naloga(nalog['ID Naloga'], "Prikupljeno", tko_preuzeo)
                             st.session_state.baza_naloga = ucitaj_naloge()
-                            st.success(f"Uspješno označeno kao preuzeto od strane vozača: {ime_vozaca_kartica.strip()}!")
+                            st.success(f"Uspješno označeno kao preuzeto od strane: {st.session_state.trenutni_vozac}!")
                             st.rerun()
 
     st.markdown("<br><br><br>", unsafe_allow_html=True)
@@ -722,6 +749,8 @@ elif st.session_state.navigacija == "📊 Pregled & Upravljanje":
                 c3.markdown(f"🏢 **{nalog['Dobavljac']}**<br>_{nalog['Adresa Prikupa']}_", unsafe_allow_html=True)
                 
                 status_tekst = f"**{nalog['Status']}**"
+                if nalog['Status'] == "Prikupljeno" and nalog.get('Vrijeme Obrade') and nalog.get('Vrijeme Obrade') != "-":
+                    status_tekst += f"<br><span style='font-size:0.7rem; color:#16a34a;'>{nalog['Vrijeme Obrade']}</span>"
                 if nalog['Status'] == "Storno" and nalog.get('Stornirao') and nalog.get('Stornirao') != "-":
                     status_tekst += f"<br><span style='font-size:0.7rem; color:#dc2626;'>Stornirao: {nalog['Stornirao']}</span>"
                 c4.markdown(status_tekst, unsafe_allow_html=True)
