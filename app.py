@@ -7,7 +7,8 @@ import html
 import os
 import qrcode
 from supabase import create_client, Client
-from streamlit_qrcode_scanner import qrcode_scanner
+import cv2
+import numpy as np
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
@@ -328,13 +329,29 @@ def generiraj_pdf_makromikro(nalozi_list):
 
 if st.session_state.user_role == "vozac":
     st.subheader("🚚 Terenski Mod - Skeniranje i Preuzimanje Naloga")
-    st.caption("Uključite kameru za skeniraje QR koda ili upišite ID ručno:")
+    st.caption("Uslikajte QR kod kamerom mobitela ili upišite ID ručno:")
 
     with st.container(border=True):
-        qr_code_skeniran = qrcode_scanner(key="qr_scanner")
+        slika_qr = st.file_uploader("Uslikaj QR kod naloga", type=["png", "jpg", "jpeg"], key="qr_file_uploader")
+        
+        skenirani_id_iz_slike = None
+        if slika_qr is not None:
+            try:
+                file_bytes = np.asarray(bytearray(slika_qr.read()), dtype=np.uint8)
+                opencv_image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+                qr_detector = cv2.QRCodeDetector()
+                data, bbox, straight_qrcode = qr_detector.detectAndDecode(opencv_image)
+                if data:
+                    skenirani_id_iz_slike = data.strip()
+                    st.success(f"Uspješno očitan QR kod: **{skenirani_id_iz_slike}**")
+                else:
+                    st.warning("QR kod nije pronađen na slici. Pokušajte ponovno uslikati jasnije.")
+            except Exception as e:
+                st.error(f"Greška pri čitanju QR koda sa slike: {e}")
+
         rucni_unos = st.text_input("Ili ručno upišite ID naloga:", value=st.session_state.scanned_id or "", placeholder="Npr. PR-2026-001")
         
-        active_input = qr_code_skeniran if qr_code_skeniran else rucni_unos
+        active_input = skenirani_id_iz_slike if skenirani_id_iz_slike else rucni_unos
         
         col_s1, _ = st.columns(2)
         
@@ -362,7 +379,7 @@ if st.session_state.user_role == "vozac":
         filtrirani = [x for x in filtrirani if sq in x["ID Naloga"].lower() or sq in x["Dobavljac"].lower() or sq in x["Opis robe"].lower()]
 
     if not search_query:
-        st.info("ℹ️ Skenirajte QR kod kamerom ili upišite ID naloga za brzu akciju.")
+        st.info("ℹ️ Uslikajte QR kod kamerom mobitela ili upišite ID naloga za brzu akciju.")
     elif not filtrirani:
         st.warning("Nema pronađenih naloga za zadani pojam.")
     else:
@@ -737,7 +754,6 @@ elif st.session_state.user_role == "admin" and st.session_state.navigacija == "�
             if "Datum Prikupa" in df_aktivni.columns:
                 df_temp = df_aktivni.copy()
                 df_temp["Datum_dt"] = pd.to_datetime(df_temp["Datum Prikupa"], errors="coerce")
-                # Filtriraj samo radne dane (ponedjeljak-petak: weekday < 5)
                 df_radni = df_temp[df_temp["Datum_dt"].dt.weekday < 5]
                 
                 dnevni_prikupi = df_radni["Datum Prikupa"].value_counts().reset_index()
