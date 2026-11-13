@@ -66,7 +66,8 @@ def dodaj_radne_dane(pocetni_datum, broj_dana):
 def ucitaj_naloge():
     if supabase:
         try:
-            response = supabase.table("nalozi").select("*").order("created_at", desc=False).execute()
+            # Povećano na 50000 redova da se izbjegne limit od 1000 redova
+            response = supabase.table("nalozi").select("*").order("created_at", desc=False).limit(50000).execute()
             raw_data = response.data
             nalozi = []
             for r in raw_data:
@@ -859,13 +860,11 @@ elif st.session_state.user_role == "admin" and st.session_state.navigacija == "�
         st.info("Nema podataka u bazi naloga.")
     else:
         df_vozaci = pd.DataFrame(st.session_state.baza_naloga)
-        # Filtriramo samo prikupljene naloge koje su odradili vozači
         df_prikupljeno = df_vozaci[(df_vozaci["Status"] == "Prikupljeno") & (df_vozaci["Vrijeme Obrade"].str.contains("Vozač:"))].copy()
         
         if df_prikupljeno.empty:
             st.warning("Još nema evidentiranih prikupa od strane vozača u bazi.")
         else:
-            # Ekstrahiramo ime vozača i datum iz stringa "Vozač: Ime (DD.MM.YYYY. HH:MM)"
             import re
             
             zapisani_vozaci = []
@@ -873,9 +872,7 @@ elif st.session_state.user_role == "admin" and st.session_state.navigacija == "�
             
             for index, row in df_prikupljeno.iterrows():
                 v_obrade = str(row["Vrijeme Obrade"])
-                # Tražimo ime vozača između "Vozač: " i " ("
                 match_vozac = re.search(r"Vozač:\s*(.*?)\s*\(", v_obrade)
-                # Tražimo datum u formatu DD.MM.YYYY
                 match_datum = re.search(r"(\d{2}\.\d{2}\.\d{4})", v_obrade)
                 
                 if match_vozac and match_datum:
@@ -888,7 +885,6 @@ elif st.session_state.user_role == "admin" and st.session_state.navigacija == "�
             df_prikupljeno["Vozač_Ime"] = zapisani_vozaci
             df_prikupljeno["Datum_Preuzimanja"] = zapisani_datumi
             
-            # Grupiramo po datumu i vozaču
             df_pivot = df_prikupljeno.pivot_table(
                 index="Datum_Preuzimanja",
                 columns="Vozač_Ime",
@@ -900,13 +896,11 @@ elif st.session_state.user_role == "admin" and st.session_state.navigacija == "�
             st.markdown("### 📊 Matrica učinka (Broj prikupa po danima i vozačima)")
             st.dataframe(df_pivot, use_container_width=True)
             
-            # Grafikon ukupnog učinka po vozačima
             st.markdown("### 📈 Ukupan broj obavljenih prikupa po vozaču")
             df_ukupno_vozac = df_prikupljeno["Vozač_Ime"].value_counts().reset_index()
             df_ukupno_vozac.columns = ["Vozač", "Ukupno prikupa"]
             st.bar_chart(df_ukupno_vozac.set_index("Vozač"))
             
-            # Preuzimanje izvještaja
             csv_ucinak = df_pivot.to_csv(index=False).encode('utf-8')
             st.download_button(
                 label="📥 Preuzmi Dnevni izvještaj učinka vozača (CSV)",
